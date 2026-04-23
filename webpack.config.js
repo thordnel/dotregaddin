@@ -20,6 +20,8 @@ module.exports = async (env, options) => {
       polyfill: ["core-js/stable", "regenerator-runtime/runtime"],
       taskpane: ["./src/taskpane/taskpane.js", "./src/taskpane/taskpane.html"],
       commands: "./src/commands/commands.js",
+      login: ["./src/login/login.js", "./src/login/login.html"], // New Login Entry
+      dashboard: ["./src/dashboard/dashboard.js", "./src/dashboard/dashboard.html"], // New Dashboard Entry
     },
     output: {
       clean: true,
@@ -79,6 +81,16 @@ module.exports = async (env, options) => {
         filename: "commands.html",
         template: "./src/commands/commands.html",
         chunks: ["polyfill", "commands"],
+      }),
+      new HtmlWebpackPlugin({
+        filename: "login.html",
+        template: "./src/login/login.html",
+        chunks: ["polyfill", "login"],
+      }),
+      new HtmlWebpackPlugin({
+        filename: "dashboard.html",
+        template: "./src/dashboard/dashboard.html",
+        chunks: ["polyfill", "dashboard"],
       }),
     ],
     devServer: {

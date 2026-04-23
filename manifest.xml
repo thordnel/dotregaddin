@@ -11,6 +11,7 @@
   <SupportUrl DefaultValue="https://www.contoso.com/help"/>
   <AppDomains>
     <AppDomain>https://node.tesdadvts.org</AppDomain>
+    <AppDomain>https://macdemo.tesdadvts.org</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Workbook"/>
