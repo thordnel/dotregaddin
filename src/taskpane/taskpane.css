@@ -12,16 +12,15 @@
      padding: 0;
  }
  
- .ms-welcome__header {
-    padding: 20px;
-    padding-bottom: 30px;
-    padding-top: 30px;
-    display: -webkit-flex;
+.ms-welcome__header {
     display: flex;
-    -webkit-flex-direction: column;
     flex-direction: column;
     align-items: center;
- }
+    padding: 20px 10px 22px 10px;
+}
+.ms-welcome__header img {
+    margin-bottom: 5px;
+}
 
  .ms-welcome__main {
     display: -webkit-flex;
@@ -73,4 +72,13 @@
 
 b {
     font-weight: bold;
+}
+.header-title {
+    text-align: center;
+    line-height: 1.1; /* tighter line spacing */
+    margin: 5px 0 0 0; /* reduce gap around */
+}
+
+.header-title span {
+    display: block; /* forces new line */
 }

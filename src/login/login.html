@@ -3,21 +3,57 @@
 <head>
     <meta charset="UTF-8" />
     <title>Login to DOT.REG</title>
-    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
+
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+    <link rel="stylesheet"
+          href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
+
+    <link rel="stylesheet" href="login.css">
 </head>
-<body class="ms-font-m ms-welcome">
-    <main class="ms-welcome__main">
-        <h2 class="ms-font-xl">Login Required</h2>
-        <div class="ms-TextField">
-            <input type="text" id="username" class="ms-TextField-field" placeholder="Username">
+
+<body class="ms-Fabric">
+
+<div class="container">
+    
+    <div class="header">
+        <img src="../../assets/logo-filled.png" alt="dotreg" />
+        <h1>DOT.REG Portal</h1>
+        <p class="subtitle">Please connect to your School Registrar to Initialize Class Record</p>
+    </div>
+
+    <div class="section">
+        <label>Registrar Address</label>
+        <input type="text" id="server-url"
+               placeholder="demo.test.cloudflare.com"
+               value="node.tesdadvts.org">
+
+        <div class="button-row">
+            <button id="connect-button" class="ms-Button ms-Button--primary">
+                <span class="ms-Button-label" id="connect-label">Connect</span>
+            </button>
+
+            <button id="save-settings-button" class="ms-Button" disabled>
+                <span class="ms-Button-label">Save</span>
+            </button>
         </div>
-        <div class="ms-TextField">
-            <input type="password" id="password" class="ms-TextField-field" placeholder="Password">
-        </div>
-        <button id="login-button" class="ms-Button ms-Button--primary">
-            <span class="ms-Button-label">Sign In</span>
+    </div>
+
+    <div class="section disabled" id="credentials-section">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Username" disabled>
+
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Password" disabled>
+
+        <button id="login-button" class="ms-Button ms-Button--primary full-width">
+            <span class="ms-Button-label">Sign In and Sync</span>
         </button>
-    </main>
+    </div>
+
+    <p id="status-message" class="status"></p>
+
+</div>
+
 </body>
 </html>
