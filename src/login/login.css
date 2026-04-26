@@ -142,3 +142,15 @@ input:disabled {
     text-align: center;
     min-height: 1.2em;
 }
+#status-message {
+    margin-top: 2px !important; /* Forces it to sit right under the progress info */
+    padding-top: 0px !important;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+/* If you are using the footer p tag for status */
+.status {
+    margin-top: 0px;
+    padding-top: 0px;
+}

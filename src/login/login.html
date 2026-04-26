@@ -17,7 +17,7 @@
     <header class="header">
         <img src="../../assets/logo-filled.png" alt="DOT.REG Logo" />
         <h1>DOT.REG Portal</h1>
-        <p class="subtitle">Connect to your School Registrar to initialize class records.</p>
+        <p class="subtitle">Connect to your School Registrar</p>
     </header>
 
     <div class="section">
@@ -51,24 +51,18 @@
         </div>
 
         <button id="login-button" class="ms-Button ms-Button--primary full-width" style="margin-top: 8px;">
-            <span class="ms-Button-label">Login and Sync</span>
+            <span class="ms-Button-label">Sync Class Record</span>
         </button>
     </div>
-    <div id="progress-container" style="display: none; margin-bottom: 5px;">
-        <div class="ms-ProgressIndicator">
-            <div class="ms-ProgressIndicator-itemProgress">
-                <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar" style="width: 0%; height: 4px; background-color: #0078d4; transition: width 0.3s ease;"></div>
-            </div>
-            <div id="progress-percentage" class="ms-ProgressIndicator-itemDescription" style="text-align: right; font-size: 10px; margin-top: 4px;">0%</div>
+<div id="progress-container" style="display: none; margin-bottom: -4px;"> 
+    <div class="ms-ProgressIndicator">
+        <div class="ms-ProgressIndicator-itemProgress" style="height: 4px;">
+            <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar" style="width: 0%; height: 4px; background-color: #0078d4; transition: width 0.3s ease;"></div>
         </div>
+        <div id="progress-percentage" class="ms-ProgressIndicator-itemDescription" style="text-align: right; font-size: 10px; margin-top: 0px; padding-top: 2px;">0%</div>
     </div>
-
-    <div id="status-message"></div>
-    <footer>
-        <p id="status-message" class="status"></p>
-    </footer>
-
 </div>
+<div id="status-message" style="margin-top: 0px; padding-top: 0px; font-size: 11px; min-height: 14px;"></div>
 
 </body>
 </html>

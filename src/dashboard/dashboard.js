@@ -168,7 +168,7 @@ async function handleDisconnect() {
             settingsSheet.getRange("B5").clear();
 
             // Save the changes to the file
-            context.workbook.save();
+            //context.workbook.save();
             await context.sync();
         });
 

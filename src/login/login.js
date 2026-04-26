@@ -116,7 +116,7 @@ async function saveServerToExcel() {
         //    password: "dogi" 
         //});
 
-        context.workbook.save();
+        //context.workbook.save();
         await context.sync();
     }).catch(error => console.error(error));
 }
@@ -301,9 +301,9 @@ async function handleLogin() {
             setProgress(61);
            // Download Templates (This creates Attendance and Gradesheet)
             status.innerText = "Downloading class record sheets templates...";
-            const templateUrl = `${baseUrl}/download/ClassrecordTemplate.xlsx`; 
+            const templateUrl = `${baseUrl}/download/CLSRCDTemplate.xlsx`; 
             const myBatches = await getAssignedBatchIds(); // The function we made earlier ["211", "214"]
-            const sheetsToCopy = "Attendance,Gradesheet,Midterm,FinalTerm,TraineeList";
+            const sheetsToCopy = "TraineeList,FinalTerm,Midterm,Gradesheet,Attendance";
 
             setProgress(63);
             await downloadCRperBatch(templateUrl, sheetsToCopy, myBatches);
@@ -319,7 +319,7 @@ async function handleLogin() {
                 await context.sync();
 
                 settings.visibility = Excel.SheetVisibility.veryHidden;
-                context.workbook.save();
+                //context.workbook.save();
                 await context.sync();
             });
             setProgress(100);
@@ -337,12 +337,6 @@ async function handleLogin() {
 }
 
 
-/**
- * Generic function to sync API data to a named Excel Table
- * @param {string} endpoint - The API route (e.g., '/fl_get_batchlist')
- * @param {string} sheetName - Target worksheet name
- * @param {string} tableName - Target Excel table name
- */
 /**
  * Modified Generic Sync Function
  * @param {string} endpoint - The API route
@@ -629,43 +623,50 @@ async function downloadCRperBatch(fileUrl, sheetNamesCommaSeparated, batches) {
                     newlyAddedSheet.customProperties.add("sheetType", `${baseName.toLowerCase()}_record`);
                     
                     // Logic for formula injection remains the same...
-                    switch (baseName) {
-                        case "Attendance":
-                            newlyAddedSheet.getRange("B6").values = [[batchId]]; 
-                            newlyAddedSheet.getRange("A5").formulas = [[`=XLOOKUP(B6, BatchlistTab[batchid], BatchlistTab[batchname])`]];
-                            newlyAddedSheet.getRange("A15").formulas = [[`=FILTER(HSTACK(EnrollmentTab[idnumber], LEFT(EnrollmentTab[gender], 1), EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(AND(EnrollmentTab[middlename]<>".", EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=B6)`]];
-                            newlyAddedSheet.getRange("B7").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
-                            newlyAddedSheet.getRange("B8").formulas = [[`=XLOOKUP(XLOOKUP(B6, BatchlistTab[batchid], BatchlistTab[adviser]), InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
-                            newlyAddedSheet.getRange("B9").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=B6) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];
-                            newlyAddedSheet.getRange("B10").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=B6) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];
-                            newlyAddedSheet.getRange("E8").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[trainingstart])`]];
-                            newlyAddedSheet.getRange("E12").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[midtermexamdate])`]];
-                            newlyAddedSheet.getRange("E9").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[trainingend])`]];
-                            newlyAddedSheet.getRange("F12").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[finaltermexamdate])`]];
+                switch (baseName) {
+                    case "Attendance":
+                        newlyAddedSheet.getRange("B6").values = [[batchId]]; 
+                        newlyAddedSheet.getRange("A5").formulas = [[`=XLOOKUP(B6, 'BatchlistTab'!A:A, 'BatchlistTab'!C:C)`]];
+                        // Fixed: Ensure the IF logic for Middle Initial handles empty strings correctly
+                        newlyAddedSheet.getRange("A15").formulas = [[`=FILTER(HSTACK('EnrollmentTab'!L:L, LEFT('EnrollmentTab'!G:G, 1), 'EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C & " " & IF(AND('EnrollmentTab'!D:D<>".", 'EnrollmentTab'!D:D<>""), LEFT('EnrollmentTab'!D:D, 1) & ". ", "")), 'EnrollmentTab'!K:K=B6)`]];
+                        newlyAddedSheet.getRange("B7").formulas = [[`=XLOOKUP('Settings'!B3, 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        newlyAddedSheet.getRange("B8").formulas = [[`=XLOOKUP(XLOOKUP(B6, 'BatchlistTab'!A:A, 'BatchlistTab'!J:J), 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        newlyAddedSheet.getRange("B9").formulas = [[`=XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=B6) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!D:D)`]];
+                        
+                        // FIXED: Removed the extra '=' before XLOOKUP
+                        newlyAddedSheet.getRange("B10").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=B6) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!F:F))`]];
+                        
+                        newlyAddedSheet.getRange("E8").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!H:H)`]];
+                        newlyAddedSheet.getRange("E12").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!K:K)`]];
+                        newlyAddedSheet.getRange("E9").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!I:I)`]];
+                        newlyAddedSheet.getRange("F12").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!L:L)`]];
+                        break;
 
-                            break;
-                        case "Gradesheet":
-                            newlyAddedSheet.getRange("K15").values = [[batchId]]; 
-                            newlyAddedSheet.getRange("B21").formulas = [[`=FILTER(HSTACK(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(AND(EnrollmentTab[middlename]<>".", EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=K15)`]];
-                            newlyAddedSheet.getRange("A8").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=K15) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];
-                            newlyAddedSheet.getRange("A11").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=K15) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];
-                            newlyAddedSheet.getRange("C8").formulas = [[`=XLOOKUP(K15, batchlisttab[batchid], batchlisttab[year])`]];
-                            newlyAddedSheet.getRange("C11").formulas = [[`=XLOOKUP(K15, batchlisttab[batchid], batchlisttab[period])`]];
-                            newlyAddedSheet.getRange("C14").formulas = [[`=XLOOKUP(XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[adviser]), InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
-                            newlyAddedSheet.getRange("I8").formulas = [[`=XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[batchname])`]];
-                            newlyAddedSheet.getRange("I11").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
-                            break;
-                        case "Midterm":
-                        case "FinalTerm":
-                            newlyAddedSheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT(EnrollmentTab[gender], 1), EnrollmentTab[idnumber], EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname]), EnrollmentTab[batchid]=${batchId})`]];
-                            break;
-                        case "TraineeList":
-                            newlyAddedSheet.getRange("B16").formulas = [[`=FILTER(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname], (EnrollmentTab[batchid]=${batchId})*(EnrollmentTab[gender]="Male"),"")`]];
-                            newlyAddedSheet.getRange("E16").formulas = [[`=FILTER(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname], (EnrollmentTab[batchid]=${batchId})*(EnrollmentTab[gender]="Female"),"")`]];
-                            break;
-                        default:
-                           //console.log("Created a general sheet with no specific template logic.");
-                    }
+                    case "Gradesheet":
+                        newlyAddedSheet.getRange("K15").values = [[batchId]]; 
+                        newlyAddedSheet.getRange("B20").formulas = [[`=FILTER(HSTACK('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C & " " & IF(AND('EnrollmentTab'!D:D<>".", 'EnrollmentTab'!D:D<>""), LEFT('EnrollmentTab'!D:D, 1) & ". ", "")), 'EnrollmentTab'!K:K=K15)`]];
+                        newlyAddedSheet.getRange("A8").formulas = [[`=XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=K15) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!D:D)`]];
+                        newlyAddedSheet.getRange("A11").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=K15) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!F:F))`]];
+                        newlyAddedSheet.getRange("C8").formulas = [[`=XLOOKUP(K15, 'batchlisttab'!A:A, 'batchlisttab'!F:F)`]];
+                        newlyAddedSheet.getRange("C11").formulas = [[`=XLOOKUP(K15, 'batchlisttab'!A:A, 'batchlisttab'!E:E)`]];
+                        newlyAddedSheet.getRange("C14").formulas = [[`=XLOOKUP(XLOOKUP(K15, 'BatchlistTab'!A:A, 'BatchlistTab'!J:J), 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        newlyAddedSheet.getRange("I8").formulas = [[`=XLOOKUP(K15, 'BatchlistTab'!A:A, 'BatchlistTab'!C:C)`]];
+                        newlyAddedSheet.getRange("I11").formulas = [[`=XLOOKUP('Settings'!B3, 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        break;
+
+                    case "Midterm":
+                        //newlyAddedSheet.getRange("B6").values = [[batchId]];
+                    case "FinalTerm":
+                        //newlyAddedSheet.getRange("B6").values = [[batchId]];
+                        newlyAddedSheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT('EnrollmentTab'!G:G, 1), 'EnrollmentTab'!L:L, 'EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C), 'EnrollmentTab'!K:K="${batchId}")`]];
+                        break;
+
+                    case "TraineeList":
+                        //newlyAddedSheet.getRange("B6").values = [[batchId]];
+                        newlyAddedSheet.getRange("B16").formulas = [[`=FILTER('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C, ('EnrollmentTab'!K:K="${batchId}")*('EnrollmentTab'!G:G="Male"), "")`]];
+                        newlyAddedSheet.getRange("E16").formulas = [[`=FILTER('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C, ('EnrollmentTab'!K:K="${batchId}")*('EnrollmentTab'!G:G="Female"), "")`]];
+                        break;
+                }
                     // Sync again to finalize the name change before the next loop iteration
                     await context.sync();
                 }
