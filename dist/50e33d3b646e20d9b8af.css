@@ -1,0 +1,156 @@
+/* Shared Fluent UI Aesthetics for Login */
+body {
+    margin: 0;
+    background-color: #faf9f8; /* Matches dashboard background */
+    color: #323130;
+    font-family: "Segoe UI", "Segoe UI Web (West European)", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+}
+
+.container {
+    max-width: 320px;
+    margin: 0 auto;
+    padding: 32px 20px; /* Increased top padding for balance */
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Header Refinement */
+.header {
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.header img {
+    width: 64px; /* Slightly smaller, more refined size */
+    height: 64px;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.header h1 {
+    font-size: 23px;
+    font-weight: 650;
+    color: #3f596d; /* Office Primary Blue */
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 13px;
+    color: #605e5c;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+/* Form Sections */
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.section label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #323130;
+}
+
+/* Elegant Inputs */
+input[type="text"], 
+input[type="password"] {
+    width: 100%;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    font-size: 14px;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease;
+}
+
+input:focus {
+    outline: none;
+    border-color: #0078d4;
+}
+
+input:disabled {
+    background-color: #f3f2f1;
+    border-color: #edebe9;
+    color: #a19f9d;
+}
+
+/* Button Layouts */
+.button-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* Fluent Buttons */
+.ms-Button {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 400;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    border: 1px solid #8a8886;
+    background-color: #ffffff;
+    color: #323130;
+}
+
+.ms-Button--primary {
+    background-color: #0078d4;
+    color: #ffffff;
+    border: none;
+}
+
+.ms-Button--primary:hover {
+    background-color: #106ebe;
+}
+
+.ms-Button:hover:not(.ms-Button--primary) {
+    background-color: #f3f2f1;
+    border-color: #323130;
+}
+
+.ms-Button:disabled {
+    background-color: #f3f2f1;
+    color: #a19f9d;
+    border-color: #edebe9;
+    cursor: default;
+}
+
+/* States */
+.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.status {
+    font-size: 12px;
+    color: #a4262c; /* Danger/Error Red */
+    text-align: center;
+    min-height: 1.2em;
+}
+#status-message {
+    margin-top: 2px !important; /* Forces it to sit right under the progress info */
+    padding-top: 0px !important;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+/* If you are using the footer p tag for status */
+.status {
+    margin-top: 0px;
+    padding-top: 0px;
+}

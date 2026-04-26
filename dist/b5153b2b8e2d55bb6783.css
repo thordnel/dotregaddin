@@ -1,0 +1,169 @@
+/* Modern Fluent UI Aesthetics */
+body {
+    background-color: #faf9f8; /* Light neutral background */
+    color: #323130;
+    margin: 0;
+    padding: 16px;
+    font-family: "Segoe UI", "Segoe UI Web (West European)", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Header Refinement */
+.header.small {
+    text-align: left;
+    border-bottom: 1px solid #edebe9;
+    padding-bottom: 12px;
+}
+
+.header.small h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #0078d4; /* Office Primary Blue */
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 16px;
+    color: #605e5c;
+    margin-top: 4px;
+}
+
+/* Form Sections */
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #323130;
+}
+
+/* Elegant Inputs */
+.input, select {
+    width: 100%;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    font-size: 14px;
+    background-color: #ffffff;
+    transition: border-color 0.2s ease;
+}
+
+.input:focus, select:focus {
+    outline: none;
+    border-color: #0078d4;
+}
+
+/* High-End Button Styling */
+.ms-Button {
+    background-color: #ffffff;
+    color: #323130;
+    border: 1px solid #8a8886;
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-weight: 400;
+    transition: all 0.2s;
+}
+
+.ms-Button:hover {
+    background-color: #f3f2f1;
+    border-color: #323130;
+}
+
+#disconnect-button {
+    margin-top: 8px;
+    color: #a4262c; /* Danger Red */
+    border-color: #fde7e9;
+}
+
+#disconnect-button:hover {
+    background-color: #fde7e9;
+    border-color: #a4262c;
+}
+
+/* Status Indicator */
+.status.neutral {
+    font-size: 12px;
+    text-align: center;
+    padding: 8px;
+    background: #f3f2f1;
+    border-radius: 4px;
+    color: #605e5c;
+}
+/* Darken the background */
+/* Ensure the overlay is on top of everything */
+/* Ensure the panel has internal breathing room */
+
+/* --- Authentication Slide-up Panel --- */
+
+.auth-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    display: none; /* Controlled by JS */
+    align-items: flex-end; /* Pushes panel to bottom */
+    justify-content: center;
+}
+
+.auth-panel {
+    width: 100%;
+    background: #ffffff;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
+    box-sizing: border-box;
+    
+    /* Animation setup */
+    transform: translateY(100%); 
+    transition: transform 0.3s ease-out;
+}
+
+/* Class added by JS to slide the panel up */
+.auth-panel.show {
+    transform: translateY(0) !important;
+}
+
+.panel-header {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #edebe9;
+}
+
+.panel-body {
+    padding: 20px; /* Internal breathing room */
+    display: flex;
+    flex-direction: column;
+}
+
+.auth-panel .input {
+    width: 100% !important;
+    box-sizing: border-box !important; /* Prevents edge touching */
+    margin-bottom: 15px !important;    /* Vertical gap */
+    padding: 10px;
+    height: 38px;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+}
+
+#confirm-submit {
+    width: 100%;
+    margin-top: 5px;
+}
