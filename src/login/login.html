@@ -2,13 +2,11 @@
 <html>
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login to DOT.REG</title>
 
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-
-    <link rel="stylesheet"
-          href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
-
+    <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
     <link rel="stylesheet" href="login.css">
 </head>
 
@@ -16,42 +14,59 @@
 
 <div class="container">
     
-    <div class="header">
-        <img src="../../assets/logo-filled.png" alt="dotreg" />
+    <header class="header">
+        <img src="../../assets/logo-filled.png" alt="DOT.REG Logo" />
         <h1>DOT.REG Portal</h1>
-        <p class="subtitle">Please connect to your School Registrar to Initialize Class Record</p>
-    </div>
+        <p class="subtitle">Connect to your School Registrar to initialize class records.</p>
+    </header>
 
     <div class="section">
-        <label>Registrar Address</label>
+        <label for="server-url">Registrar Address</label>
         <input type="text" id="server-url"
-               placeholder="demo.test.cloudflare.com"
-               value="node.tesdadvts.org">
+               placeholder="example.registrar.com"
+               value="macdemo.tesdadvts.org">
 
         <div class="button-row">
-            <button id="connect-button" class="ms-Button ms-Button--primary">
+            <button id="connect-button" class="ms-Button ms-Button--primary full-width">
                 <span class="ms-Button-label" id="connect-label">Connect</span>
             </button>
 
-            <button id="save-settings-button" class="ms-Button" disabled>
-                <span class="ms-Button-label">Save</span>
+            <button id="save-settings-button" class="ms-Button" disabled title="Save address">
+                <i class="ms-Icon ms-Icon--Save"></i>
             </button>
         </div>
     </div>
 
+    <hr style="border: 0; border-top: 1px solid #edebe9; margin: 8px 0;" />
+
     <div class="section disabled" id="credentials-section">
-        <label>Username</label>
-        <input type="text" id="username" placeholder="Username" disabled>
+        <div class="section">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter username" disabled>
+        </div>
 
-        <label>Password</label>
-        <input type="password" id="password" placeholder="Password" disabled>
+        <div class="section">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="Enter password" disabled>
+        </div>
 
-        <button id="login-button" class="ms-Button ms-Button--primary full-width">
-            <span class="ms-Button-label">Sign In and Sync</span>
+        <button id="login-button" class="ms-Button ms-Button--primary full-width" style="margin-top: 8px;">
+            <span class="ms-Button-label">Login and Sync</span>
         </button>
     </div>
+    <div id="progress-container" style="display: none; margin-bottom: 5px;">
+        <div class="ms-ProgressIndicator">
+            <div class="ms-ProgressIndicator-itemProgress">
+                <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar" style="width: 0%; height: 4px; background-color: #0078d4; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="progress-percentage" class="ms-ProgressIndicator-itemDescription" style="text-align: right; font-size: 10px; margin-top: 4px;">0%</div>
+        </div>
+    </div>
 
-    <p id="status-message" class="status"></p>
+    <div id="status-message"></div>
+    <footer>
+        <p id="status-message" class="status"></p>
+    </footer>
 
 </div>
 
