@@ -1,3 +1,4 @@
+// @ts-check
 /* global document, Office, Excel, localStorage, window */
 
 Office.onReady((info) => {
@@ -5,11 +6,28 @@ Office.onReady((info) => {
         initializeDashboard();
         
         // Target the elements
-        const submitBtn = document.getElementById('submit-gradesheet');
+    const submitBtn = document.getElementById('submit-gradesheet');
     const authOverlay = document.getElementById('auth-overlay');
     const authPanel = document.getElementById('auth-panel');
     const closeBtn = document.getElementById('close-panel');
+    const refreshBtn = document.getElementById("refresh-batch-view");
+    const dropdown = document.getElementById("class-dropdown");
 
+        if (refreshBtn) {
+            refreshBtn.onclick = async () => {
+                const selectedValue = dropdown.value;
+                if (selectedValue && selectedValue !== "loading") {
+                    const status = document.getElementById("status-message");
+                    status.innerText = "Refreshing view...";
+                    // Manually trigger the selection logic
+                    await handleBatchSelection(selectedValue);
+                    status.innerText = "View Refreshed";
+                    setTimeout(() => { status.innerText = ""; }, 2000);
+                }
+            };
+        }
+        
+        
     if (submitBtn) {
         // --- 1. SHOW PANEL ---
         submitBtn.onclick = function() {
@@ -45,7 +63,33 @@ Office.onReady((info) => {
         const disconnectBtn = document.getElementById("disconnect-button");
         if (disconnectBtn) disconnectBtn.onclick = handleDisconnect;
     }
+
+    const syncBtn = document.getElementById('sync-attendance');
+if (syncBtn) {
+    syncBtn.onclick = refreshCalendar;
+}
     
+    const syncUpdatesBtn = document.getElementById("sync-classupdates");
+
+if (syncUpdatesBtn) {
+    syncUpdatesBtn.onclick = async () => {
+        const status = document.getElementById("status-message");
+        const rawAddress = localStorage.getItem("registrar_url");
+        const baseUrl = `https://${rawAddress}`; // Remember your demo masking logic!
+
+        try {
+            // Re-use the exact same logic from the login flow
+            await performFullSync(setProgress, status, baseUrl);
+            
+            // Re-hide sheets as needed
+            await hideAllBatchSheets(); 
+            status.innerText = "Updates synchronized successfully.";
+        } catch (error) {
+            status.innerText = "❌ Sync Failed: " + error.message;
+            status.style.color = "red";
+        }
+    };
+}
 });
 
 async function handleSubmitGrades() {
@@ -58,6 +102,10 @@ async function initializeDashboard() {
     const nameDisplay = document.getElementById("instructor-name");
     const dropdown = document.getElementById("class-dropdown");
 
+    const currentUrl = localStorage.getItem("registrar_url");
+    if (currentUrl === "render-demoaddin-api.onrender.com") {
+        document.getElementById("demo-strip").style.display = "block";
+    }
     dropdown.onchange = () => handleBatchSelection(dropdown.value);
     
     const instructorName = localStorage.getItem("instructor_name");
@@ -164,7 +212,7 @@ async function handleDisconnect() {
             
             // We only clear B3:B5 (UserID, Username, InstName) 
             // We keep B2 (Server URL) so the user doesn't have to re-type the server
-            settingsSheet.getRange("B3").clear();
+            //settingsSheet.getRange("B3").clear();
             settingsSheet.getRange("B5").clear();
 
             // Save the changes to the file
@@ -291,4 +339,98 @@ async function activateAttendanceByBatch(targetBatchId) {
             console.warn(`Could not find Attendance sheet for Batch ID: ${targetBatchId}`);
         }
     });
+}
+
+function excelSerialToJSDate(serial) {
+    // Excel base date is Dec 30, 1899. 
+    // The difference between Excel and JS epochs is 25569 days.
+    const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+    return date;
+}
+
+async function refreshCalendar() {
+    try {
+        await Excel.run(async (context) => {
+            const sheet = context.workbook.worksheets.getActiveWorksheet();
+            
+            // 1. Get Values for validation (E12 and F12)
+            const dateRange = sheet.getRange("E12:F12");
+            dateRange.load("values");
+            
+            // 2. Load the header range to find the date columns (H12:OH12)
+            const headerRange = sheet.getRange("H12:HO12");
+            headerRange.load("values");
+
+            await context.sync();
+
+        // 2. Extract the numbers from the 2D arrays
+            const startSerial = dateRange.values[0][0]; // The number from E12
+            const endSerial = dateRange.values[0][1];   // The number from F12
+const headerRow = headerRange.values[0];
+
+    // Debugging logs
+    console.log("StartSerial:", startSerial); 
+
+    // 2. Use .findIndex with explicit conversion to prevent Type Mismatch
+    const startOffset = headerRow.findIndex(cell => {
+        return cell !== "" && Math.floor(Number(cell)) === Math.floor(Number(startSerial));
+    });
+
+    const endOffset = headerRow.findIndex(cell => {
+        return cell !== "" && Math.floor(Number(cell)) === Math.floor(Number(endSerial));
+    });
+
+    if (startOffset === -1) {
+        // If it's still -1, let's see what is actually in the first 5 header cells
+        console.warn("Match not found. First 5 headers are:", headerRow.slice(0, 5));
+        return;
+    }
+
+    // 3. Map back to Excel Column Index (H is 7)
+    const startColIdx = startOffset + 7;
+    const endColIdx = endOffset + 7;
+
+    console.log(`Success! Start Column Index: ${startColIdx}`);
+            
+            // 5. If you NEED the JS Date for other logic (like month names), convert it AFTER finding it
+            //const realStartDate = excelSerialToJSDate(startSerial);
+            
+            // 4. Batch set formulas (Much faster than looping rows)
+            // Example: Setting the row 13 formulas
+            const formulaRange = sheet.getRange("E13:F13");
+            formulaRange.formulas = [[
+                "=SUMPRODUCT((INDIRECT(H$1):INDIRECT(I$1)=1)*(INDIRECT(H$1):INDIRECT(I$1)<>\"\"))",
+                "=SUMPRODUCT((INDIRECT(H$2):INDIRECT(I$2)=1)*(INDIRECT(H$2):INDIRECT(I$2)<>\"\"))"
+            ]];
+
+            await context.sync();
+            
+            // 5. Call your formatting function
+            //await mergeMonthsLogic(context, sheet);
+        });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function mergeMonthsLogic(context, sheet) {
+    // This assumes you've already found your start/end columns
+    // This is a snippet of how to do the "Medium" border from your VB code
+    const mergeRange = sheet.getRange("H10:Z10"); // Example range
+    
+    mergeRange.merge();
+    mergeRange.format.horizontalAlignment = "Center";
+    mergeRange.format.verticalAlignment = "Center";
+    mergeRange.format.font.bold = true;
+
+    // Apply the thick outer border
+    const borders = mergeRange.format.borders;
+    const sides = ["EdgeTop", "EdgeBottom", "EdgeLeft", "EdgeRight"];
+    
+    sides.forEach(side => {
+        borders.getItem(side).style = "Continuous";
+        borders.getItem(side).weight = "Medium";
+    });
+
+    await context.sync();
 }

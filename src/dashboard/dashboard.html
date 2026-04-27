@@ -4,14 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DOT.REG Dashboard</title>
-
+    <script src="../common/syncEngine.js"></script>
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
     <link rel="stylesheet" href="dashboard.css">
 </head>
 
 <body class="ms-Fabric">
-
+<div id="demo-strip" style="display: none; background-color: #a4262c; color: white; text-align: center; padding: 4px 0; font-size: 11px; font-weight: bold; width: 100%; letter-spacing: 1px;">
+        FULL-FEATURE DEMO
+    </div>
 <div class="container ms-welcome">
 
     <header class="header small">
@@ -20,16 +22,24 @@
         </p>
     </header>
 
-    <div class="section">
-        <label class="ms-Label" for="class-dropdown">Available Class</label>
-        <select id="class-dropdown" class="input" style="width: 100%; margin-bottom: 8px;">
+<div class="section">
+    <label class="ms-Label" for="class-dropdown">Available Class</label>
+    <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 8px;">
+        <select id="class-dropdown" class="input" style="flex-grow: 1;">
             <option value="" disabled selected>Select a class...</option>
             <option value="loading">Loading classes...</option>
         </select>
-        <button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%;">
-            <span class="ms-Button-label">Sync Attendance</span>
+        <button id="refresh-batch-view" class="ms-Button" style="min-width: 32px; padding: 0; height: 32px;" title="Refresh View">
+            <i class="ms-Icon ms-Icon--Refresh"></i>
         </button>
     </div>
+    <button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%; margin-bottom: 4px;">
+        <span class="ms-Button-label">Sync Attendance</span>
+    </button>
+    <button id="sync-classupdates" class="ms-Button ms-Button--primary" style="width: 100%;">
+        <span class="ms-Button-label">Sync Class Updates</span>
+    </button>
+</div>
 
     <div class="section" style="margin-top: 20px;">
         <label class="ms-Label">Today's Schedule:</label>
@@ -39,7 +49,7 @@
     </div>
 
     <div class="section group-box" style="border: 1px solid #edebe9; padding: 15px; margin-top: 20px; border-radius: 2px;">
-        <label class="ms-Label" style="font-weight: 600; margin-bottom: 10px; display: block;">Options</label>
+        <label class="ms-Label" style="font-weight: 600; margin-bottom: 10px; display: block;">Gradesheet Options</label>
         
         <div class="option-item" style="margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -47,7 +57,7 @@
                 <input type="checkbox" id="manual-toggle">
             </div>
             <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
-                Use this if you are still transitioning from older or physical class records.
+                Check this enter to final grades in the gradesheet. Uncheck to automatically calculate from the provided class record.
             </p>
         </div>
 
@@ -58,8 +68,16 @@
         </button>
     </div>
 
-    <div id="status-message" class="ms-fontSize-s" style="margin-top: 15px; height: 20px; color: #0078d4; text-align: center; font-weight: 400;">
+<div id="progress-container" style="display: none; margin-bottom: 4px;"> 
+    <div class="ms-ProgressIndicator">
+        <div class="ms-ProgressIndicator-itemProgress" style="height: 4px;">
+            <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar" style="width: 0%; height: 4px; background-color: #0078d4; transition: width 0.3s ease;"></div>
         </div>
+        <div id="progress-percentage" class="ms-ProgressIndicator-itemDescription" style="text-align: right; font-size: 10px; margin-top: 0px; padding-top: 2px;">0%</div>
+    </div>
+</div>
+<div id="status-message" class="ms-fontSize-s" style="margin-top: 15px; height: 20px; color: #0078d4; text-align: center; font-weight: 400;">
+</div>
 
     <hr style="border: 0; border-top: 1px solid #f3f2f1; margin: 25px 0;">
 
@@ -82,7 +100,7 @@
     
     <div class="panel-body">
         <p class="ms-fontSize-s" style="margin-bottom: 20px;">
-            Please enter your password to submit grades to the Registrar.
+            Please enter your password to proceed.
         </p>
         
     
