@@ -1,6 +1,9 @@
 // src/common/syncEngine.js
 
 async function performFullSync(setProgress, status, baseUrl) {
+    setProgress(2);
+    status.innerText = "Cleaning existing data...";
+    await cleanupApiData();
                 setProgress(5);
                 status.innerText = "Syncing Class Record...";
                 setProgress(15);
@@ -47,6 +50,30 @@ async function performFullSync(setProgress, status, baseUrl) {
     setProgress(100);
     status.innerText = "Sync Complete!";
 }
+
+async function cleanupApiData() {
+    await Excel.run(async (context) => {
+        const sheets = context.workbook.worksheets;
+        sheets.load("items/name");
+        await context.sync();
+
+        // Find all sheets that we created via API (those ending in 'tab')
+        const sheetsToDelete = sheets.items.filter(sheet => 
+            sheet.name.toLowerCase().endsWith("tab") || 
+            sheet.name.toLowerCase() === "classstandingtab"
+        );
+
+        sheetsToDelete.forEach(sheet => {
+            sheet.delete();
+        });
+
+        await context.sync();
+    }).catch(err => {
+        // Ignore errors if sheets don't exist
+        console.log("Cleanup: No existing tab sheets found.");
+    });
+}
+
 async function getAssignedBatchIds() {
     
     const instructorId = localStorage.getItem("user_id");

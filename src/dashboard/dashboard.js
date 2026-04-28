@@ -1,97 +1,157 @@
 // @ts-check
 /* global document, Office, Excel, localStorage, window */
+let authCallback = null;
 
 Office.onReady((info) => {
     if (info.host === Office.HostType.Excel) {
         initializeDashboard();
         
-        // Target the elements
-    const submitBtn = document.getElementById('submit-gradesheet');
-    const authOverlay = document.getElementById('auth-overlay');
-    const authPanel = document.getElementById('auth-panel');
-    const closeBtn = document.getElementById('close-panel');
-    const refreshBtn = document.getElementById("refresh-batch-view");
-    const dropdown = document.getElementById("class-dropdown");
+        // --- BUTTON SELECTIONS ---
+        const submitBtn = document.getElementById('submit-gradesheet');
+        const refreshBtn = document.getElementById("refresh-batch-view");
+        const dropdown = document.getElementById("class-dropdown");
+        const disconnectBtn = document.getElementById("disconnect-button");
+        const syncBtn = document.getElementById('sync-attendance');
+        const syncUpdatesBtn = document.getElementById("sync-classupdates");
+        const confirmBtn = document.getElementById("confirm-submit");
+        const closeBtn = document.getElementById('close-panel');
+        const authOverlay = document.getElementById('auth-overlay');
 
+        // --- REFRESH BATCH VIEW ---
         if (refreshBtn) {
             refreshBtn.onclick = async () => {
                 const selectedValue = dropdown.value;
                 if (selectedValue && selectedValue !== "loading") {
                     const status = document.getElementById("status-message");
                     status.innerText = "Refreshing view...";
-                    // Manually trigger the selection logic
                     await handleBatchSelection(selectedValue);
                     status.innerText = "View Refreshed";
                     setTimeout(() => { status.innerText = ""; }, 2000);
                 }
             };
         }
-        
-        
-    if (submitBtn) {
-        // --- 1. SHOW PANEL ---
-        submitBtn.onclick = function() {
-            authOverlay.style.setProperty('display', 'flex', 'important');
-            setTimeout(() => {
-                authPanel.classList.add('show');
-            }, 50);
-        };
 
-        // --- 2. HIDE PANEL (Close Button) ---
-        if (closeBtn) {
-            closeBtn.onclick = function() {
-                hidePanel();
+        // --- AUTH PANEL CONTROLS ---
+        if (submitBtn) {
+            submitBtn.onclick = () => showAuthOverlay(() => handleSubmitGrades());
+        }
+
+        if (closeBtn) closeBtn.onclick = hidePanel;
+        
+        if (authOverlay) {
+            authOverlay.onclick = (e) => {
+                if (e.target === authOverlay) hidePanel();
             };
         }
 
-        // --- 3. HIDE PANEL (Clicking the dark background) ---
-        authOverlay.onclick = function(e) {
-            // Only hide if the user clicked the dark part, not the white box
-            if (e.target === authOverlay) {
-                hidePanel();
-            }
-        };
-    }
+        // --- RE-AUTH SUBMIT LOGIC (The Fixed Part) ---
+        if (confirmBtn) {
+            confirmBtn.onclick = async () => {
+                const passField = /** @type {HTMLInputElement} */ (document.getElementById("panel-pass"));
+                const pass = passField.value;
+                const user = localStorage.getItem("username");
+                const rawAddress = localStorage.getItem("registrar_url");
+                const status = document.getElementById("status-message");
 
-    function hidePanel() {
-        authPanel.classList.remove('show');
-        // Wait for the slide animation (0.3s) before hiding the background
-        setTimeout(() => {
-            authOverlay.style.display = 'none';
-        }, 300);
-    }
-        const disconnectBtn = document.getElementById("disconnect-button");
-        if (disconnectBtn) disconnectBtn.onclick = handleDisconnect;
-    }
+                if (!pass) return;
 
-    const syncBtn = document.getElementById('sync-attendance');
-if (syncBtn) {
-    syncBtn.onclick = refreshCalendar;
-}
-    
-    const syncUpdatesBtn = document.getElementById("sync-classupdates");
+                confirmBtn.disabled = true;
+                confirmBtn.innerText = "Verifying...";
 
-if (syncUpdatesBtn) {
-    syncUpdatesBtn.onclick = async () => {
-        const status = document.getElementById("status-message");
-        const rawAddress = localStorage.getItem("registrar_url");
-        const baseUrl = `https://${rawAddress}`; // Remember your demo masking logic!
+                try {
+                    const response = await fetch(`https://${rawAddress}/apilogin`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username: user, password: pass })
+                    });
 
-        try {
-            // Re-use the exact same logic from the login flow
-            await performFullSync(setProgress, status, baseUrl);
-            
-            // Re-hide sheets as needed
-            await hideAllBatchSheets(); 
-            status.innerText = "Updates synchronized successfully.";
-        } catch (error) {
-            status.innerText = "❌ Sync Failed: " + error.message;
-            status.style.color = "red";
+                    if (response.ok) {
+                        const data = await response.json();
+                        localStorage.setItem("access_token", data.access_token);
+                        
+                        passField.value = "";
+                        hidePanel(); 
+                        
+                        if (authCallback) {
+                            status.innerText = "Re-authenticated. Finishing task...";
+                            await authCallback(); 
+                            authCallback = null; 
+                        }
+                    } else {
+                        alert("Incorrect password. Please try again.");
+                    }
+                } catch (err) {
+                    console.error("Re-auth Error:", err);
+                    alert("Connection error.");
+                } finally {
+                    confirmBtn.disabled = false;
+                    confirmBtn.innerText = "Submit";
+                }
+            };
         }
-    };
-}
+
+        // --- SYNC CLASS UPDATES ---
+        if (syncUpdatesBtn) {
+            syncUpdatesBtn.onclick = async () => {
+                const status = document.getElementById("status-message");
+                const rawAddress = localStorage.getItem("registrar_url");
+                const baseUrl = `https://${rawAddress}`;
+
+                try {
+                    await performFullSync(setProgress, status, baseUrl);
+                    await postSyncCleanup();
+                } catch (error) {
+                    if (error.message.includes("401") || error.message.includes("Unauthorized")) {
+                        status.innerText = "Session expired. Re-authenticating...";
+                        showAuthOverlay(async () => {
+                            status.innerText = "Resuming sync...";
+                            await performFullSync(setProgress, status, baseUrl);
+                            await postSyncCleanup();
+                        });
+                    } else {
+                        status.innerText = "❌ Sync Failed: " + error.message;
+                        status.style.color = "red";
+                    }
+                }
+            };
+        }
+
+        if (disconnectBtn) disconnectBtn.onclick = handleDisconnect;
+        if (syncBtn) syncBtn.onclick = refreshCalendar;
+    }
 });
 
+// --- HELPER FUNCTIONS (Outside Office.onReady for access) ---
+
+function showAuthOverlay(onSuccessCallback) {
+    const authOverlay = document.getElementById('auth-overlay');
+    const authPanel = document.getElementById('auth-panel');
+    authCallback = onSuccessCallback; 
+    
+    authOverlay.style.setProperty('display', 'flex', 'important');
+    setTimeout(() => {
+        authPanel.classList.add('show');
+        const passInput = document.getElementById("panel-pass");
+        if (passInput) passInput.focus();
+    }, 50);
+}
+
+function hidePanel() {
+    const authOverlay = document.getElementById('auth-overlay');
+    const authPanel = document.getElementById('auth-panel');
+    authPanel.classList.remove('show');
+    setTimeout(() => {
+        authOverlay.style.display = 'none';
+    }, 300);
+}
+
+async function postSyncCleanup() {
+    const status = document.getElementById("status-message");
+    await initializeDashboard();
+    await hideAllBatchSheets();
+    status.innerText = "Sync complete and list refreshed!";
+    status.style.color = "green";
+}
 async function handleSubmitGrades() {
     const status = document.getElementById("status-message");
     status.innerText = "Processing gradesheet submission...";
@@ -183,6 +243,7 @@ async function initializeDashboard() {
 }
 
 function updateDropdown(dropdown, classes) {
+    // This line prevents the list from just growing longer and longer
     dropdown.innerHTML = '<option value="" disabled selected>Select a class...</option>';
     
     if (classes.length === 0) {
@@ -434,3 +495,9 @@ async function mergeMonthsLogic(context, sheet) {
 
     await context.sync();
 }
+
+// dashboard.js global scope
+
+
+
+// Attach this to your "Confirm Submit" button in dashboard.js
