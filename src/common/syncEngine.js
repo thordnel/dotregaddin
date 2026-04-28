@@ -1,41 +1,50 @@
 // src/common/syncEngine.js
 
 async function performFullSync(setProgress, status, baseUrl) {
+    await Excel.run(async (context) => {
+        // 1. SET CALCULATION TO MANUAL
+        context.workbook.application.calculationMode = Excel.CalculationMode.manual;
+        
+        // 2. SUSPEND SCREEN UPDATING
+        context.workbook.application.suspendScreenUpdatingUntilNextSync();
+        
+        await context.sync();
+    });
     setProgress(2);
     status.innerText = "Cleaning existing data...";
     await cleanupApiData();
-                setProgress(5);
-                status.innerText = "Syncing Class Record...";
-                setProgress(15);
-                status.innerText = "Importing batches data...";
-                await refreshBatchlistData();
-                setProgress(20);
-                status.innerText = "Importing instructors data...";
-                await refreshInstructorData();
-                setProgress(27);
-                status.innerText = "Importing enrollment data...";
-                await refreshEnrollmentData();
-                setProgress(32);
-                status.innerText = "Importing transcript data...";
-                await refreshTranscriptData();
-                setProgress(35);
-                status.innerText = "Importing attendance data...";
-                await refreshAttendanceData();
-                setProgress(40);
-                status.innerText = "Importing schedule data...";
-                await refreshScheduleData();
-                setProgress(47);
-                status.innerText = "Importing class standing data...";
-                await refreshClassStandingData();
-                setProgress(47);
-                status.innerText = "Importing transmutation data...";
-                await refreshTransmutationData();
-                setProgress(51);
-                status.innerText = "Importing room data...";
-                setProgress(57);
-                await refreshRoomsData();
-                status.innerText = "Importing subject data...";
-                await refreshSubjectData();
+    setProgress(5);
+    status.innerText = "Syncing Class Record...";
+    setProgress(15);
+    status.innerText = "Importing batches data...";
+    await refreshBatchlistData();
+    setProgress(20);
+    status.innerText = "Importing instructors data...";
+    await refreshInstructorData();
+    setProgress(27);
+    status.innerText = "Importing enrollment data...";
+    await refreshEnrollmentData();
+    setProgress(32);
+    status.innerText = "Importing transcript data...";
+    await refreshTranscriptData();
+    setProgress(35);
+    status.innerText = "Importing attendance data...";
+    await refreshAttendanceData();
+    setProgress(40);
+    status.innerText = "Importing schedule data...";
+    await refreshScheduleData();
+    setProgress(47);
+    status.innerText = "Importing class standing data...";
+    await refreshClassStandingData();
+    setProgress(47);
+    status.innerText = "Importing transmutation data...";
+    await refreshTransmutationData();
+    setProgress(51);
+    status.innerText = "Importing room data...";
+    setProgress(57);
+    await refreshRoomsData();
+    status.innerText = "Importing subject data...";
+    await refreshSubjectData();
 
     // 2. Template Downloads
     status.innerText = "Downloading templates...";
@@ -46,7 +55,23 @@ async function performFullSync(setProgress, status, baseUrl) {
     await downloadCRperBatch(templateUrl, sheetsToCopy, myBatches);
     setProgress(97);
     await downloadTemplate(templateUrl, "Advisory,InstructorSchedule,Base60", 1);
+    setProgress(98);
+    status.innerText = "Reconstructing formulas...";
+    await reapplyAllFormulas();
+    status.innerText = "Recalculating workbook...";
     
+    await Excel.run(async (context) => {
+        // 1. Restore Calculation to Automatic
+        context.workbook.application.calculationMode = Excel.CalculationMode.automatic;
+        
+        // 2. Force a full recalculation to fix any remaining #REF! or #BUSY! displays
+        context.workbook.application.calculate(Excel.CalculationType.full);
+        
+        // 3. (Optional) Re-enable screen updating if you manually turned it off
+        // context.workbook.application.screenUpdating = true; 
+
+        await context.sync();
+    });
     setProgress(100);
     status.innerText = "Sync Complete!";
 }
@@ -54,24 +79,25 @@ async function performFullSync(setProgress, status, baseUrl) {
 async function cleanupApiData() {
     await Excel.run(async (context) => {
         const sheets = context.workbook.worksheets;
+        const tables = context.workbook.tables;
         sheets.load("items/name");
+        tables.load("items/name");
         await context.sync();
 
-        // Find all sheets that we created via API (those ending in 'tab')
+        // 1. Delete Sheets ending in 'tab'
         const sheetsToDelete = sheets.items.filter(sheet => 
-            sheet.name.toLowerCase().endsWith("tab") || 
-            sheet.name.toLowerCase() === "classstandingtab"
+            sheet.name.toLowerCase().endsWith("tab")
         );
+        sheetsToDelete.forEach(sheet => sheet.delete());
 
-        sheetsToDelete.forEach(sheet => {
-            sheet.delete();
-        });
+        // 2. Safety: Delete Tables specifically if the sheet survived
+        const tablesToDelete = tables.items.filter(table => 
+            table.name.toLowerCase().endsWith("tab")
+        );
+        tablesToDelete.forEach(table => table.delete());
 
         await context.sync();
-    }).catch(err => {
-        // Ignore errors if sheets don't exist
-        console.log("Cleanup: No existing tab sheets found.");
-    });
+    }).catch(err => console.log("Cleanup handled."));
 }
 
 async function getAssignedBatchIds() {
@@ -195,7 +221,7 @@ async function syncTableFromApi(endpoint, sheetName, tableName, params = {}) {
 
         await Excel.run(async (context) => {
             
-            context.workbook.application.suspendScreenUpdatingUntilNextSync()
+            //context.workbook.application.suspendScreenUpdatingUntilNextSync()
             const sheets = context.workbook.worksheets;
             let sheet = sheets.getItemOrNullObject(sheetName);
             await context.sync();
@@ -476,52 +502,7 @@ async function downloadCRperBatch(fileUrl, sheetNamesCommaSeparated, batches) {
                     newlyAddedSheet.customProperties.add("batchid", String(batchId));
                     newlyAddedSheet.customProperties.add("sheetType", `${baseName.toLowerCase()}_record`);
                     
-                    // Logic for formula injection remains the same...
-                switch (baseName) {
-                    case "Attendance":
-                        newlyAddedSheet.getRange("B6").values = [[batchId]]; 
-                        newlyAddedSheet.getRange("A5").formulas = [[`=XLOOKUP(B6, 'BatchlistTab'!A:A, 'BatchlistTab'!C:C)`]];
-                        // Fixed: Ensure the IF logic for Middle Initial handles empty strings correctly
-                        newlyAddedSheet.getRange("A15").formulas = [[`=FILTER(HSTACK('EnrollmentTab'!L:L, LEFT('EnrollmentTab'!G:G, 1), 'EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C & " " & IF(AND('EnrollmentTab'!D:D<>".", 'EnrollmentTab'!D:D<>""), LEFT('EnrollmentTab'!D:D, 1) & ". ", "")), 'EnrollmentTab'!K:K=B6)`]];
-                        newlyAddedSheet.getRange("B7").formulas = [[`=XLOOKUP('Settings'!B3, 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
-                        newlyAddedSheet.getRange("B8").formulas = [[`=XLOOKUP(XLOOKUP(B6, 'BatchlistTab'!A:A, 'BatchlistTab'!J:J), 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
-                        newlyAddedSheet.getRange("B9").formulas = [[`=XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=B6) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!D:D)`]];
-                        
-                        // FIXED: Removed the extra '=' before XLOOKUP
-                        newlyAddedSheet.getRange("B10").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=B6) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!F:F))`]];
-                        
-                        newlyAddedSheet.getRange("E8").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!H:H)`]];
-                        newlyAddedSheet.getRange("E12").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!K:K)`]];
-                        newlyAddedSheet.getRange("E9").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!I:I)`]];
-                        newlyAddedSheet.getRange("F12").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!L:L)`]];
-                        break;
-
-                    case "Gradesheet":
-                        newlyAddedSheet.getRange("K15").values = [[batchId]]; 
-                        newlyAddedSheet.getRange("B20").formulas = [[`=FILTER(HSTACK('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C & " " & IF(AND('EnrollmentTab'!D:D<>".", 'EnrollmentTab'!D:D<>""), LEFT('EnrollmentTab'!D:D, 1) & ". ", "")), 'EnrollmentTab'!K:K=K15)`]];
-                        newlyAddedSheet.getRange("A8").formulas = [[`=XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=K15) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!D:D)`]];
-                        newlyAddedSheet.getRange("A11").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=K15) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!F:F))`]];
-                        newlyAddedSheet.getRange("C8").formulas = [[`=XLOOKUP(K15, 'batchlisttab'!A:A, 'batchlisttab'!F:F)`]];
-                        newlyAddedSheet.getRange("C11").formulas = [[`=XLOOKUP(K15, 'batchlisttab'!A:A, 'batchlisttab'!E:E)`]];
-                        newlyAddedSheet.getRange("C14").formulas = [[`=XLOOKUP(XLOOKUP(K15, 'BatchlistTab'!A:A, 'BatchlistTab'!J:J), 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
-                        newlyAddedSheet.getRange("I8").formulas = [[`=XLOOKUP(K15, 'BatchlistTab'!A:A, 'BatchlistTab'!C:C)`]];
-                        newlyAddedSheet.getRange("I11").formulas = [[`=XLOOKUP('Settings'!B3, 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
-                        break;
-
-                    case "Midterm":
-                        //newlyAddedSheet.getRange("B6").values = [[batchId]];
-                    case "FinalTerm":
-                        //newlyAddedSheet.getRange("B6").values = [[batchId]];
-                        newlyAddedSheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT('EnrollmentTab'!G:G, 1), 'EnrollmentTab'!L:L, 'EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C), 'EnrollmentTab'!K:K="${batchId}")`]];
-                        break;
-
-                    case "TraineeList":
-                        //newlyAddedSheet.getRange("B6").values = [[batchId]];
-                        newlyAddedSheet.getRange("B16").formulas = [[`=FILTER('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C, ('EnrollmentTab'!K:K="${batchId}")*('EnrollmentTab'!G:G="Male"), "")`]];
-                        newlyAddedSheet.getRange("E16").formulas = [[`=FILTER('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C, ('EnrollmentTab'!K:K="${batchId}")*('EnrollmentTab'!G:G="Female"), "")`]];
-                        break;
-                }
-                    // Sync again to finalize the name change before the next loop iteration
+                    await injectSheetFormulas(newlyAddedSheet, baseName, batchId)
                     await context.sync();
                 }
             }
@@ -543,4 +524,86 @@ function arrayBufferToBase64(buffer) {
         binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
+}
+
+
+/**
+ * Centralized place for all workbook formulas.
+ * Prevents #REF! errors by re-applying logic after tables are rebuilt.
+ */
+async function injectSheetFormulas(sheet, baseName, batchId) {
+    switch (baseName) {
+                     
+                    case "Attendance":
+                        sheet.getRange("B6").values = [[batchId]]; 
+                        sheet.getRange("A5").formulas = [[`=XLOOKUP(B6, 'BatchlistTab'!A:A, 'BatchlistTab'!C:C)`]];
+                        // Fixed: Ensure the IF logic for Middle Initial handles empty strings correctly
+                        sheet.getRange("A15").formulas = [[`=FILTER(HSTACK('EnrollmentTab'!L:L, LEFT('EnrollmentTab'!G:G, 1), 'EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C & " " & IF(AND('EnrollmentTab'!D:D<>".", 'EnrollmentTab'!D:D<>""), LEFT('EnrollmentTab'!D:D, 1) & ". ", "")), 'EnrollmentTab'!K:K=B6)`]];
+                        sheet.getRange("B7").formulas = [[`=XLOOKUP('Settings'!B3, 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        sheet.getRange("B8").formulas = [[`=XLOOKUP(XLOOKUP(B6, 'BatchlistTab'!A:A, 'BatchlistTab'!J:J), 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        sheet.getRange("B9").formulas = [[`=XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=B6) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!D:D)`]];
+                        
+                        // FIXED: Removed the extra '=' before XLOOKUP
+                        sheet.getRange("B10").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=B6) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!F:F))`]];
+                        
+                        sheet.getRange("E8").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!H:H)`]];
+                        sheet.getRange("E12").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!K:K)`]];
+                        sheet.getRange("E9").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!I:I)`]];
+                        sheet.getRange("F12").formulas = [[`=XLOOKUP(B6, 'batchlisttab'!A:A, 'batchlisttab'!L:L)`]];
+                        break;
+
+                    case "Gradesheet":
+                        sheet.getRange("K15").values = [[batchId]]; 
+                        sheet.getRange("B20").formulas = [[`=FILTER(HSTACK('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C & " " & IF(AND('EnrollmentTab'!D:D<>".", 'EnrollmentTab'!D:D<>""), LEFT('EnrollmentTab'!D:D, 1) & ". ", "")), 'EnrollmentTab'!K:K=K15)`]];
+                        sheet.getRange("A8").formulas = [[`=XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=K15) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!D:D)`]];
+                        sheet.getRange("A11").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, ('TranscriptTab'!B:B=K15) * ('TranscriptTab'!D:D='Settings'!B3), 'TranscriptTab'!E:E), 'SubjectTab'!A:A, 'SubjectTab'!F:F))`]];
+                        sheet.getRange("C8").formulas = [[`=XLOOKUP(K15, 'batchlisttab'!A:A, 'batchlisttab'!F:F)`]];
+                        sheet.getRange("C11").formulas = [[`=XLOOKUP(K15, 'batchlisttab'!A:A, 'batchlisttab'!E:E)`]];
+                        sheet.getRange("C14").formulas = [[`=XLOOKUP(XLOOKUP(K15, 'BatchlistTab'!A:A, 'BatchlistTab'!J:J), 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        sheet.getRange("I8").formulas = [[`=XLOOKUP(K15, 'BatchlistTab'!A:A, 'BatchlistTab'!C:C)`]];
+                        sheet.getRange("I11").formulas = [[`=XLOOKUP('Settings'!B3, 'InstructorsTab'!A:A, 'InstructorsTab'!D:D & " " & LEFT('InstructorsTab'!E:E, 1) & ". " & 'InstructorsTab'!C:C & IF('InstructorsTab'!F:F<>"", ", " & 'InstructorsTab'!F:F, ""))`]];
+                        break;
+
+                    case "Midterm":
+                        //sheet.getRange("B6").values = [[batchId]];
+                    case "FinalTerm":
+                        //sheet.getRange("B6").values = [[batchId]];
+                        sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT('EnrollmentTab'!G:G, 1), 'EnrollmentTab'!L:L, 'EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C), 'EnrollmentTab'!K:K="${batchId}")`]];
+                        break;
+
+                    case "TraineeList":
+                        //sheet.getRange("B6").values = [[batchId]];
+                        sheet.getRange("B16").formulas = [[`=FILTER('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C, ('EnrollmentTab'!K:K="${batchId}")*('EnrollmentTab'!G:G="Male"), "")`]];
+                        sheet.getRange("E16").formulas = [[`=FILTER('EnrollmentTab'!B:B & ", " & 'EnrollmentTab'!C:C, ('EnrollmentTab'!K:K="${batchId}")*('EnrollmentTab'!G:G="Female"), "")`]];
+                        break;
+                }
+          
+                
+}
+    
+async function reapplyAllFormulas() {
+    await Excel.run(async (context) => {
+        const sheets = context.workbook.worksheets;
+        sheets.load("items/name, items/customProperties");
+        await context.sync();
+
+        for (const sheet of sheets.items) {
+            // Find batch sheets (e.g., Attendance_211)
+            if (sheet.name.includes("_")) {
+                const batchProp = sheet.customProperties.getItemOrNullObject("batchid");
+                const typeProp = sheet.customProperties.getItemOrNullObject("sheetType");
+                batchProp.load("value");
+                typeProp.load("value");
+                await context.sync();
+
+                if (!batchProp.isNullObject && !typeProp.isNullObject) {
+                    const batchId = batchProp.value;
+                    // Extract baseName (Attendance, Gradesheet, etc.)
+                    const baseName = sheet.name.split("_")[0]; 
+                    await injectSheetFormulas(sheet, baseName, batchId);
+                }
+            }
+        }
+        await context.sync();
+    });
 }

@@ -330,63 +330,13 @@ async function handleLogin() {
 
     // 3. Conditional Download Block
     if (!tablesExist) {
-        setProgress(5);
-        status.innerText = "Login successful! Preparing your Class Record...";
-
-
-
-    
-                setProgress(15);
-
-                status.innerText = "Importing batches data...";
-                await refreshBatchlistData();
-                setProgress(20);
-                status.innerText = "Importing instructors data...";
-                await refreshInstructorData();
-                setProgress(27);
-                status.innerText = "Importing enrollment data...";
-                await refreshEnrollmentData();
-                setProgress(32);
-                status.innerText = "Importing transcript data...";
-                await refreshTranscriptData();
-                setProgress(35);
-                status.innerText = "Importing attendance data...";
-                await refreshAttendanceData();
-                setProgress(40);
-                status.innerText = "Importing schedule data...";
-                await refreshScheduleData();
-                setProgress(47);
-                status.innerText = "Importing class standing data...";
-                await refreshClassStandingData();
-                setProgress(47);
-                status.innerText = "Importing transmutation data...";
-                await refreshTransmutationData();
-                setProgress(51);
-                status.innerText = "Importing room data...";
-                setProgress(57);
-                await refreshRoomsData();
-                status.innerText = "Importing subject data...";
-                await refreshSubjectData();
-
-                setProgress(61);
-                // Download Templates (This creates Attendance and Gradesheet)
-                status.innerText = "Downloading class record sheets templates...";
-                const templateUrl = `${baseUrl}/download/CLSRCDTemplate.xlsx`;
-                const myBatches = await getAssignedBatchIds(); // The function we made earlier ["211", "214"]
-                const sheetsToCopy = "TraineeList,FinalTerm,Midterm,Gradesheet,Attendance";
-
-                setProgress(63);
-                await downloadCRperBatch(templateUrl, sheetsToCopy, myBatches);
-                setProgress(97);
-                await downloadTemplate(templateUrl, "Advisory,InstructorSchedule,Base60", 1);
-                // 3. Final Step: Verify Attendance exists, activate it, hide Settings, and remove Sheet1
-
-                status.innerText = "Class Record is ready. Opening dashboard...";
-                setProgress(100);
-            } else {
-                status.innerText = "Welcome back! Opening dashboard...";
-                setProgress(100);
-            }
+        // REPLACE ALL THOSE setProgress/refreshData lines with this:
+        const baseUrl = `https://${rawAddress}`;
+        await performFullSync(setProgress, status, baseUrl);
+    } else {
+        status.innerText = "Welcome back! Opening dashboard...";
+        setProgress(100);
+    }
 
             await Excel.run(async (context) => {
                 const sheets = context.workbook.worksheets;
