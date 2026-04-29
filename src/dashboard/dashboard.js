@@ -44,75 +44,104 @@ Office.onReady((info) => {
             };
         }
 
-        // --- RE-AUTH SUBMIT LOGIC (The Fixed Part) ---
-        if (confirmBtn) {
-            confirmBtn.onclick = async () => {
-                const passField = /** @type {HTMLInputElement} */ (document.getElementById("panel-pass"));
-                const pass = passField.value;
-                const user = localStorage.getItem("username");
-                const rawAddress = localStorage.getItem("registrar_url");
-                const status = document.getElementById("status-message");
+if (confirmBtn) {
+    confirmBtn.onclick = async () => {
+        const passField = document.getElementById("panel-pass");
+        const pass = passField.value;
+        const user = await getSettingValue(4);
+        const rawAddress = await getSettingValue(2);
+        const mainStatus = document.getElementById("status-message");
+        const authStatus = document.getElementById("auth-status"); // Target the internal status
 
-                if (!pass) return;
-
-                confirmBtn.disabled = true;
-                confirmBtn.innerText = "Verifying...";
-
-                try {
-                    const response = await fetch(`https://${rawAddress}/apilogin`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ username: user, password: pass })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        localStorage.setItem("access_token", data.access_token);
-                        
-                        passField.value = "";
-                        hidePanel(); 
-                        
-                        if (authCallback) {
-                            status.innerText = "Re-authenticated. Finishing task...";
-                            await authCallback(); 
-                            authCallback = null; 
-                        }
-                    } else {
-                        alert("Incorrect password. Please try again.");
-                    }
-                } catch (err) {
-                    console.error("Re-auth Error:", err);
-                    alert("Connection error.");
-                } finally {
-                    confirmBtn.disabled = false;
-                    confirmBtn.innerText = "Submit";
-                }
-            };
+        if (!pass) {
+            authStatus.innerText = "❌ Password is required.";
+            authStatus.style.color = "red";
+            return;
         }
 
+        confirmBtn.disabled = true;
+        //confirmBtn.innerText = "Verifying...";
+        authStatus.innerText = "Verifying...";
+        authStatus.style.color = "#0078d4";
+
+        try {
+            const response = await fetch(`https://${rawAddress}/apilogin`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                await setWorkbookSetting(6, data.access_token);
+                
+                passField.value = "";
+                authStatus.innerText = ""; // Clear internal status
+                hidePanel(); 
+                
+                if (authCallback) {
+                    // Switch back to main status since the panel is now hidden
+                    mainStatus.innerText = "✅ Verified. Resuming task...";
+                    mainStatus.style.color = "green";
+                    await authCallback(); 
+                    authCallback = null; 
+                }
+            } else {
+                authStatus.innerText = "❌ Incorrect password. Try again.";
+                authStatus.style.color = "red";
+                passField.value = "";
+                passField.focus();
+            }
+        } catch (err) {
+            console.error("Re-auth Error:", err);
+            authStatus.innerText = "❌ Connection error.";
+            authStatus.style.color = "red";
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerText = "Submit";
+        }
+    };
+}
+        
+        if (closeBtn) {
+    closeBtn.onclick = () => hidePanel(true); // Pass true for cancellation
+}
+
+if (authOverlay) {
+    authOverlay.onclick = (e) => {
+        if (e.target === authOverlay) {
+            hidePanel(true); // Pass true for cancellation
+        }
+    };
+}
+        
         // --- SYNC CLASS UPDATES ---
         if (syncUpdatesBtn) {
             syncUpdatesBtn.onclick = async () => {
                 const status = document.getElementById("status-message");
-                const rawAddress = localStorage.getItem("registrar_url");
+                const rawAddress = await getSettingValue(2);
                 const baseUrl = `https://${rawAddress}`;
 
-                try {
-                    await performFullSync(setProgress, status, baseUrl);
-                    await postSyncCleanup();
-                } catch (error) {
-                    if (error.message.includes("401") || error.message.includes("Unauthorized")) {
-                        status.innerText = "Session expired. Re-authenticating...";
-                        showAuthOverlay(async () => {
-                            status.innerText = "Resuming sync...";
-                            await performFullSync(setProgress, status, baseUrl);
-                            await postSyncCleanup();
-                        });
-                    } else {
-                        status.innerText = "❌ Sync Failed: " + error.message;
-                        status.style.color = "red";
+                const startSync = async () => {
+                    try {
+                        await performFullSync(setProgress, status, baseUrl);
+                        await postSyncCleanup();
+                    } catch (error) {
+                        // If the token is missing OR expired (401/403)
+                        if (error.message.includes("401") || error.message.includes("Missing")) {
+                            status.innerText = "Authentication required...";
+                            showAuthOverlay(async () => {
+                                status.innerText = "Resuming sync...";
+                                await startSync(); // Try again after password is entered
+                            });
+                        } else {
+                            status.innerText = "❌ Sync Failed: " + error.message;
+                            status.style.color = "red";
+                        }
                     }
-                }
+                };
+
+                await startSync();
             };
         }
 
@@ -136,10 +165,20 @@ function showAuthOverlay(onSuccessCallback) {
     }, 50);
 }
 
-function hidePanel() {
+function hidePanel(isCancellation = false) {
     const authOverlay = document.getElementById('auth-overlay');
     const authPanel = document.getElementById('auth-panel');
+    const status = document.getElementById("status-message");
+
     authPanel.classList.remove('show');
+    
+    if (isCancellation) {
+        status.innerText = "⚠️ Sync cancelled by user.";
+        status.style.color = "#ffa500"; // Orange
+         setProgress(0);
+        authCallback = null; // Clear the callback so it doesn't run later
+    }
+
     setTimeout(() => {
         authOverlay.style.display = 'none';
     }, 300);
@@ -149,8 +188,14 @@ async function postSyncCleanup() {
     const status = document.getElementById("status-message");
     await initializeDashboard();
     await hideAllBatchSheets();
-    status.innerText = "Sync complete and list refreshed!";
+    status.innerText = "Sync complete.";
     status.style.color = "green";
+
+    setTimeout(() => {
+        setProgress(0);
+        status.innerText = "Ready";
+        status.style.color = "#605e5c"; // Neutral gray
+    }, 5000);
 }
 async function handleSubmitGrades() {
     const status = document.getElementById("status-message");
@@ -162,14 +207,14 @@ async function initializeDashboard() {
     const nameDisplay = document.getElementById("instructor-name");
     const dropdown = document.getElementById("class-dropdown");
 
-    const currentUrl = localStorage.getItem("registrar_url");
+    const currentUrl = await getSettingValue(2);
     if (currentUrl === "render-demoaddin-api.onrender.com") {
         document.getElementById("demo-strip").style.display = "block";
     }
     dropdown.onchange = () => handleBatchSelection(dropdown.value);
     
-    const instructorName = localStorage.getItem("instructor_name");
-    const instructorId = localStorage.getItem("user_id");
+    const instructorName = await getSettingValue(5);
+    const instructorId = await getSettingValue(3);
 
     if (instructorName) nameDisplay.innerText = instructorName;
     if (!instructorId) return;
@@ -261,32 +306,42 @@ function updateDropdown(dropdown, classes) {
 
 async function handleDisconnect() {
     try {
-        // 1. Clear session from localStorage so the guardrails don't auto-skip login
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("instructor_name");
-        localStorage.removeItem("user_id");
-        //localStorage.removeItem("username");
+        // 1. Clear the specific metadata settings
+        await clearWorkbookSetting(6); // Token
+        await clearWorkbookSetting(5); // Instructor Name
+        await clearWorkbookSetting(3); // Instructor ID
 
-        // 2. Clear values in the veryHidden Settings sheet
+        // 2. Excel Workbook Cleanup
         await Excel.run(async (context) => {
             const settingsSheet = context.workbook.worksheets.getItem("Settings");
-            
-            // We only clear B3:B5 (UserID, Username, InstName) 
-            // We keep B2 (Server URL) so the user doesn't have to re-type the server
-            //settingsSheet.getRange("B3").clear();
-            settingsSheet.getRange("B5").clear();
+            const worksheets = context.workbook.worksheets;
 
-            // Save the changes to the file
-            //context.workbook.save();
+            // Load worksheet names so we can iterate through them
+            worksheets.load("items/name");
+
+            // Clear the range B3:B5 in the Settings sheet
+            // This clears UserID, Username, and InstName but leaves B2 (Server URL)
+            settingsSheet.getRange("B5:B5").clear();
+
+            await context.sync();
+
+            // 3. Make all hidden class sheets visible again before disconnecting
+            // This ensures the next user doesn't start with a broken/empty UI
+            worksheets.items.forEach((sheet) => {
+                if (sheet.name.includes("_")) {
+                    sheet.visibility = Excel.SheetVisibility.visible;
+                }
+            });
+
             await context.sync();
         });
 
-        // 3. Redirect back to login page
+        // 4. Redirect back to login page
         window.location.href = "login.html";
 
     } catch (error) {
         console.error("Disconnect Error: ", error);
-        // Fallback: if Excel fails, still redirect so the user isn't stuck
+        // Fallback: Ensure the user is redirected even if Excel logic fails
         window.location.href = "login.html";
     }
 }
@@ -320,43 +375,48 @@ async function handleBatchSelection(selectedBatchId) {
 
     try {
         await Excel.run(async (context) => {
+            // 1. Freeze UI
             context.workbook.application.suspendScreenUpdatingUntilNextSync();
-            // Note: Use 'suspendScreenUpdatingUntilNextSync' only if your version supports it.
-            // If it errors, just remove this line.
-            const worksheets = context.workbook.worksheets;
             
-            // 1. Load sheets
+            const worksheets = context.workbook.worksheets;
             worksheets.load("items/name");
             await context.sync();
 
-            for (let sheet of worksheets.items) {
-                // Only look at sheets with underscores (Attendance_211, etc.)
-                if (sheet.name.includes("_")) {
-                    const props = sheet.customProperties;
-                    const batchProp = props.getItemOrNullObject("batchid");
-                    
+            // 2. Map sheets to their property objects and load them
+            const sheetProcessingList = worksheets.items
+                .filter(sheet => sheet.name.includes("_"))
+                .map(sheet => {
+                    const batchProp = sheet.customProperties.getItemOrNullObject("batchid");
                     batchProp.load("value");
-                    await context.sync();
+                    return { sheet, batchProp }; // Keep them paired up
+                });
+            
+            // 3. Sync once to get all property values
+            await context.sync();
 
-                    // 2. Check if the metadata matches the selected ID
-                    if (!batchProp.isNullObject && String(batchProp.value) === String(selectedBatchId)) {
-                        sheet.visibility = Excel.SheetVisibility.visible;
-                    } else {
-                        sheet.visibility = Excel.SheetVisibility.hidden;
-                    }
+            // 4. Perform toggles using the paired list
+            for (const item of sheetProcessingList) {
+                // Now item.batchProp.value and item.batchProp.isNullObject are ready
+                if (!item.batchProp.isNullObject && String(item.batchProp.value) === String(selectedBatchId)) {
+                    item.sheet.visibility = Excel.SheetVisibility.visible;
+                } else {
+                    item.sheet.visibility = Excel.SheetVisibility.hidden;
                 }
             }
+
+            // 5. Push all changes at once
             await context.sync();
         });
 
-        // 3. After toggling visibility, teleport the user to the Attendance sheet
-        // We pass the selectedBatchId here!
+        // 6. Move to the sheet
         await activateAttendanceByBatch(selectedBatchId);
 
     } catch (error) {
         console.error("Error toggling sheets via metadata:", error);
     }
 }
+
+
 async function activateAttendanceByBatch(targetBatchId) {
     await Excel.run(async (context) => {
         const worksheets = context.workbook.worksheets;
@@ -496,8 +556,4 @@ async function mergeMonthsLogic(context, sheet) {
     await context.sync();
 }
 
-// dashboard.js global scope
 
-
-
-// Attach this to your "Confirm Submit" button in dashboard.js

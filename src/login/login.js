@@ -41,7 +41,7 @@ async function toggleConnection() {
         }
         // 1. Strict Validation: Fail if ANY protocol is detected
         if (rawValue.includes("://")) {
-            status.innerText = "❌ Error: Do not include 'https://' or 'http://'. Use address only.";
+            status.innerText = "❌ Error: Use address only (no https://).";
             status.style.color = "red";
             return;
         }
@@ -53,7 +53,15 @@ async function toggleConnection() {
 
         // 2. Prepend https:// for the connection test only
         const baseUrl = `https://${rawValue}`;
-        status.innerText = "Testing connection...";
+        if (urlInput.value.trim() === "demo") {
+            status.innerText = "Connecting to the Demo server... ";
+            status.style.color = "#0078d4";
+        } else {
+            status.innerText = "Connecting to server...";
+            status.style.color = "#0078d4";
+        }
+        
+        
 
         try {
             // Testing your /check endpoint
@@ -71,13 +79,20 @@ async function toggleConnection() {
                     inputs.forEach(i => i.disabled = false);
                 }
                 
-                status.innerText = "✅ Connected to Secure Server";
-                status.style.color = "green";
+
+
+                if (urlInput.value.trim() === "demo") {
+                    status.innerText = "✅ Connected to Secure Server";
+                    status.style.color = "green";
+                } else {
+                    status.innerText = "✅ Connected to Secure Server";
+                    status.style.color = "green";
+                }
             } else {
                 throw new Error();
             }
         } catch (err) {
-            status.innerText = "❌ Connection Failed. Please verify that the address is correct. If the issue persists, contact your system administrator for assistance.";
+            status.innerText = "❌ Failed connection to this server.";
             status.style.color = "red";
         }
     } else {
@@ -117,12 +132,13 @@ async function clearRegistrationSettings() {
                 usernameField.disabled = false;
                 
                 // Clear LocalStorage to prevent auto-resuming
-                localStorage.removeItem("user_id");
-                localStorage.removeItem("username");
-                localStorage.removeItem("instructor_name");
+                await clearWorkbookSetting(3)
+                await clearWorkbookSetting(4)
+                await clearWorkbookSetting(5)
 
-                status.innerText = "Registration cleared. You can now enter a new username.";
-                status.style.color = "blue";
+
+                status.innerText = "Registration cleared. Username unblocked.";
+                status.style.color = "#0078d4";
             }
         });
     } catch (error) {
@@ -168,6 +184,7 @@ async function loadSettingsFromExcel() {
         const settingsSheet = context.workbook.worksheets.getItemOrNullObject("Settings");
         // Load Server (B2), UserID (B3), Username (B4), InstName (B5)
         const range = settingsSheet.getRange("A2:B5"); 
+        settingsSheet.calculate();
         range.load("values");
         await context.sync();
 
@@ -188,7 +205,9 @@ async function loadSettingsFromExcel() {
             }
 
             // Always store the TRUE URL for background sync functions
-            localStorage.setItem("registrar_url", savedServer); 
+            await setWorkbookSetting(2, savedServer); 
+
+            
             // --- END MASKING LOGIC ---
 
             // --- MODIFIED LOGIC START ---
@@ -204,10 +223,11 @@ async function loadSettingsFromExcel() {
                 status.innerText = `Welcome back, ${savedInstName}. Resuming session...`;
                 status.style.color = "green";
 
-                localStorage.setItem("registrar_url", savedServer);
-                localStorage.setItem("user_id", savedUserID);
-                localStorage.setItem("username", savedUsername);
-                localStorage.setItem("instructor_name", savedInstName);
+                await setWorkbookSetting(2, savedServer); 
+                await setWorkbookSetting(3, savedUserID); 
+                await setWorkbookSetting(4, savedUsername); 
+                await setWorkbookSetting(5, savedInstName); 
+
 
                 setTimeout(() => {
                     window.location.href = "dashboard.html";
@@ -234,12 +254,7 @@ async function handleLogin() {
     const pass = document.getElementById("password").value;
     const status = document.getElementById("status-message");
     
-    // Change 'const' to 'let' so you can reassign it
     let rawAddress = document.getElementById("server-url").value.trim();
-    
-    console.log(rawAddress);
-
-    // Now this reassignment will work without the readonly error
     if (rawAddress.toLowerCase() === "demo") {
         rawAddress = "render-demoaddin-api.onrender.com";
     }
@@ -251,8 +266,8 @@ async function handleLogin() {
         return;
     }
 
-    // --- NEW VALIDATION BLOCK ---
-    var registeredUser = ""
+    // 1. Validation: Check if this workbook is already registered to someone else
+    let registeredUser = "";
     const isUserValid = await Excel.run(async (context) => {
         const settingsSheet = context.workbook.worksheets.getItemOrNullObject("Settings");
         settingsSheet.load("isNullObject");
@@ -262,28 +277,24 @@ async function handleLogin() {
             const userRange = settingsSheet.getRange("B4");
             userRange.load("values");
             await context.sync();
-            
             registeredUser = String(userRange.values[0][0]).trim();
   
-            // If C3 has a value and it doesn't match the input username
             if (registeredUser && registeredUser !== "" && user !== registeredUser) {
                 return false; 
             }
         }
-        return true; // Sheet doesn't exist or user matches
+        return true;
     });
 
     if (!isUserValid) {
-        status.innerText = "Error: Username does not match the registered user for this workbook.";
+        status.innerText = "Error: Username does not match the registered user.";
         status.style.color = "red";
-        const usernameField = document.getElementById("username");
-        usernameField.value = registeredUser;
-        usernameField.disabled = true;
-        return; // STOP the login process here
+        document.getElementById("username").value = registeredUser;
+        return;
     }
-    console.log(isUserValid);
-    saveServerToExcel() 
+
     status.innerText = "Authenticating...";
+    status.style.color = "#0078d4";
 
     try {
         const response = await fetch(`${baseUrl}/apilogin`, {
@@ -292,75 +303,58 @@ async function handleLogin() {
             body: JSON.stringify({ username: user, password: pass })
         });
 
-        
         if (response.ok) {
             const data = await response.json();
-    const tablesExist = await checkCoreTablesExist();
+            const tablesExist = await checkCoreTablesExist();
 
-    // 1. ALWAYS store session info in LocalStorage
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("registrar_url", rawAddress);
-    localStorage.setItem("instructor_name", data.instructor);
-    localStorage.setItem("user_id", data.user_id);
-    localStorage.setItem("username", user);
-
-    // 2. ALWAYS Update Settings Sheet in Excel (Crucial fix)
-    await Excel.run(async (context) => {
-        const sheets = context.workbook.worksheets;
-        let settingsSheet = sheets.getItemOrNullObject("Settings");
-        await context.sync();
-
-        if (settingsSheet.isNullObject) {
-            settingsSheet = sheets.add("Settings");
-        }
-
-        const uId = data.user_id ? String(data.user_id) : "";
-        const uName = user ? String(user) : "";
-        const iName = data.instructor ? String(data.instructor) : "";
-
-        // Update B3, B4, and B5
-        settingsSheet.getRange("A3:B5").values = [
-            ["userid", uId],
-            ["username", uName],
-            ["instname", iName]
-        ];
-
-        await context.sync();
-    });
-
-    // 3. Conditional Download Block
-    if (!tablesExist) {
-        // REPLACE ALL THOSE setProgress/refreshData lines with this:
-        const baseUrl = `https://${rawAddress}`;
-        await performFullSync(setProgress, status, baseUrl);
-    } else {
-        status.innerText = "Welcome back! Opening dashboard...";
-        setProgress(100);
-    }
-
+            // 2. SUCCESS: Save everything to the Settings Sheet (B2:B6)
+            // This is the "Passport" that makes multiple workbooks work safely!
             await Excel.run(async (context) => {
-                const sheets = context.workbook.worksheets;
-                const attendance = sheets.getItemOrNullObject("Attendance");
-                const sheet1 = sheets.getItemOrNullObject("Sheet1");
-                const notepad = sheets.getItemOrNullObject("Notepad");
-                const settings = sheets.getItem("Settings");
+                let settingsSheet = context.workbook.worksheets.getItemOrNullObject("Settings");
                 await context.sync();
 
-                settings.visibility = Excel.SheetVisibility.veryHidden;
-                //context.workbook.save();
+                if (settingsSheet.isNullObject) {
+                    settingsSheet = context.workbook.worksheets.add("Settings");
+                }
+
+                // Update Labels (A) and Values (B)
+                // B2: Server, B3: UserID, B4: Username, B5: InstName, B6: Token
+                settingsSheet.getRange("A2:B6").values = [
+                    ["server", rawAddress],
+                    ["userid", String(data.user_id)],
+                    ["username", user],
+                    ["instname", data.instructor],
+                    ["token", data.access_token] 
+                ];
+                settingsSheet.calculate();
+
+                settingsSheet.visibility = Excel.SheetVisibility.veryHidden;
                 await context.sync();
             });
+
+            // 3. Sync Logic
+            if (!tablesExist) {
+                status.innerText = "New Workbook detected. Starting full sync...";
+                await performFullSync(setProgress, status, baseUrl);
+            } else {
+                status.innerText = "Welcome back! Opening dashboard...";
+                setProgress(100);
+            }
+
+            // 4. Final Cleanup and Redirect
             setTimeout(() => { window.location.href = "dashboard.html"; }, 1500);
 
         } else {
             const errorData = await response.json();
             status.innerText = "Login failed: " + (errorData.message || "Invalid credentials");
+            status.style.color = "red";
         }
     } catch (error) {
         status.innerText = "❌ Error: " + error.message;
         console.error(error);
     }
 }
+
 async function checkCoreTablesExist() {
     return await Excel.run(async (context) => {
         // We check for EnrollmentTab as the "anchor" table

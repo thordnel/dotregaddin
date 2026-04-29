@@ -80,7 +80,7 @@ if (excelRows.length > 0) {
 
           
         
-        status.innerText = `✅ Successfully loaded ${excelRows.length} records into '${sheetName}'.`;
+        status.innerText = `✅ Loadedo ${excelRows.length} records into '${sheetName}'.`;
       } else {
         status.innerText = "⚠️ No records found.";
       }

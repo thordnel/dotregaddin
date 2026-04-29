@@ -26,7 +26,7 @@
         <label for="server-url">Registrar Address</label>
         <input type="text" id="server-url"
                placeholder="demo"
-               value="node.tesdadvts.org">
+               value="macdemo.tesdadvts.org">
 
         <div class="button-row">
             <button id="connect-button" class="ms-Button ms-Button--primary full-width">
@@ -56,15 +56,19 @@
             <span class="ms-Button-label">Sync Class Record</span>
         </button>
     </div>
-<div id="progress-container" style="display: none; margin-bottom: -4px;"> 
+<div id="progress-container" style="display: none;"> 
     <div class="ms-ProgressIndicator">
-        <div class="ms-ProgressIndicator-itemProgress" style="height: 4px;">
-            <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar" style="width: 0%; height: 4px; background-color: #0078d4; transition: width 0.3s ease;"></div>
+        <div class="ms-ProgressIndicator-itemProgress">
+            <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar"></div>
         </div>
-        <div id="progress-percentage" class="ms-ProgressIndicator-itemDescription" style="text-align: right; font-size: 10px; margin-top: 0px; padding-top: 2px;">0%</div>
     </div>
 </div>
-<div id="status-message" style="margin-top: 0px; padding-top: 0px; font-size: 11px; min-height: 14px;"></div>
+<div id="progress-percentage" 
+     class="ms-ProgressIndicator-itemDescription" 
+     style="display: none; text-align: right; font-size: 10px; margin-top: 0px; padding-top: 2px;">
+     0%
+</div>
+<div id="status-message"></div>
 
 </body>
 </html>

@@ -68,16 +68,8 @@
         </button>
     </div>
 
-<div id="progress-container" style="display: none; margin-bottom: 4px;"> 
-    <div class="ms-ProgressIndicator">
-        <div class="ms-ProgressIndicator-itemProgress" style="height: 4px;">
-            <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar" style="width: 0%; height: 4px; background-color: #0078d4; transition: width 0.3s ease;"></div>
-        </div>
-        <div id="progress-percentage" class="ms-ProgressIndicator-itemDescription" style="text-align: right; font-size: 10px; margin-top: 0px; padding-top: 2px;">0%</div>
-    </div>
-</div>
-<div id="status-message" class="ms-fontSize-s" style="margin-top: 15px; height: 20px; color: #0078d4; text-align: center; font-weight: 400;">
-</div>
+
+  
 
     <hr style="border: 0; border-top: 1px solid #f3f2f1; margin: 25px 0;">
 
@@ -85,33 +77,48 @@
         <button id="disconnect-button" class="ms-Button" style="width: 100%; border-color: #a4262c;">
             <span class="ms-Button-label" style="color: #a4262c;">Disconnect Account</span>
         </button>
-        <p class="ms-fontSize-xs" style="color: #605e5c; margin-top: 10px; font-style: italic;">
-            Use class record without connection to the registrar.
+        <p class="ms-fontSize-xs" style="color: #605e5c; margin-top: 10px; ">
+            Manage your class records offline. This workbook will be exclusively locked to your profile. Log in any time.
         </p>
     </div>
 
-</div>
 <div id="auth-overlay" class="auth-overlay">
-        <div id="auth-panel" class="auth-panel">
-    <div class="panel-header">
-        <span class="ms-fontWeight-semibold">Authentication Required</span>
-        <button id="close-panel" style="background:none; border:none; cursor:pointer; font-size: 22px;">&times;</button>
-    </div>
-    
-    <div class="panel-body">
-        <p class="ms-fontSize-s" style="margin-bottom: 20px;">
-            Please enter your password to proceed.
-        </p>
+    <div id="auth-panel" class="auth-panel">
+        <div class="panel-header">
+            <span class="ms-fontWeight-semibold">Authentication Required</span>
+            <button id="close-panel" style="background:none; border:none; cursor:pointer; font-size: 22px;">&times;</button>
+        </div>
         
-    
-        <input type="password" id="panel-pass" class="input" placeholder="Password">
-        
-        <button id="confirm-submit" class="ms-Button ms-Button--hero">
-            <span class="ms-Button-label">Submit</span>
-        </button>
+        <div class="panel-body">
+            <p class="ms-fontSize-s" style="margin-bottom: 10px;">
+                Please enter your password to proceed.
+            </p>
+
+            <div id="auth-status" style="margin-bottom: 10px; font-size: 11px; min-height: 14px; text-align: center;"></div>
+            
+            <input type="password" id="panel-pass" class="input" placeholder="Password">
+            
+            <button id="confirm-submit" class="ms-Button ms-Button--hero">
+                <span class="ms-Button-label">Submit</span>
+            </button>
+        </div>
     </div>
 </div>
+
+<div id="progress-container" style="display: none;"> 
+    <div class="ms-ProgressIndicator">
+        <div class="ms-ProgressIndicator-itemProgress">
+            <div id="progress-bar-width" class="ms-ProgressIndicator-progressBar"></div>
+        </div>
     </div>
+</div>
+<div id="progress-percentage" 
+     class="ms-ProgressIndicator-itemDescription" 
+     style="display: none; text-align: right; font-size: 10px; margin-top: 0px; padding-top: 2px;">
+     0%
+</div>
+<div id="status-message"></div>
+
 <script src="dashboard.js"></script>
 
 </body>
