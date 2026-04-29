@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>b51b75a5-61d6-45ba-8f9d-b03b35126fb2</Id>
-  <Version>1.0.0.15</Version>
+  <Version>1.0.0.16</Version>
   <ProviderName>DOTREG Software</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DOT.REG Class Record"/>
@@ -10,7 +10,7 @@
   <HighResolutionIconUrl DefaultValue="https://thordnel.github.io/dotregaddin/assets/64.png"/>
   <SupportUrl DefaultValue="https://thordnel.github.io/dotregaddin/help"/>
   <AppDomains>
-    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>https://thordnel.github.io/dotregaddin</AppDomain>
     <AppDomain>https://node.tesdadvts.org</AppDomain>
     <AppDomain>https://macdemo.tesdadvts.org</AppDomain>
   </AppDomains>
