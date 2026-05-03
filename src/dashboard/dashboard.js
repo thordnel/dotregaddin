@@ -4,7 +4,17 @@ let authCallback = null;
 
 Office.onReady((info) => {
     if (info.host === Office.HostType.Excel) {
+        Excel.run(async (context) => {
+            const worksheets = context.workbook.worksheets;
+            worksheets.onActivated.add(onSheetActivated);
+            await context.sync();
+            console.log("Event listener registered successfully."); // This only logs ONCE at startup
+        });
+
         initializeDashboard();
+
+
+
         
         // --- BUTTON SELECTIONS ---
         const submitBtn = document.getElementById('submit-gradesheet');
@@ -44,76 +54,76 @@ Office.onReady((info) => {
             };
         }
 
-if (confirmBtn) {
-    confirmBtn.onclick = async () => {
-        const passField = document.getElementById("panel-pass");
-        const pass = passField.value;
-        const user = await getSettingValue(4);
-        const rawAddress = await getSettingValue(2);
-        const mainStatus = document.getElementById("status-message");
-        const authStatus = document.getElementById("auth-status"); // Target the internal status
+        if (confirmBtn) {
+            confirmBtn.onclick = async () => {
+                const passField = document.getElementById("panel-pass");
+                const pass = passField.value;
+                const user = await getSettingValue(4);
+                const rawAddress = await getSettingValue(2);
+                const mainStatus = document.getElementById("status-message");
+                const authStatus = document.getElementById("auth-status"); // Target the internal status
 
-        if (!pass) {
-            authStatus.innerText = "❌ Password is required.";
-            authStatus.style.color = "red";
-            return;
-        }
-
-        confirmBtn.disabled = true;
-        //confirmBtn.innerText = "Verifying...";
-        authStatus.innerText = "Verifying...";
-        authStatus.style.color = "#0078d4";
-
-        try {
-            const response = await fetch(`https://${rawAddress}/apilogin`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username: user, password: pass })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                await setWorkbookSetting(6, data.access_token);
-                
-                passField.value = "";
-                authStatus.innerText = ""; // Clear internal status
-                hidePanel(); 
-                
-                if (authCallback) {
-                    // Switch back to main status since the panel is now hidden
-                    mainStatus.innerText = "✅ Verified. Resuming task...";
-                    mainStatus.style.color = "green";
-                    await authCallback(); 
-                    authCallback = null; 
+                if (!pass) {
+                    authStatus.innerText = "❌ Password is required.";
+                    authStatus.style.color = "red";
+                    return;
                 }
-            } else {
-                authStatus.innerText = "❌ Incorrect password. Try again.";
-                authStatus.style.color = "red";
-                passField.value = "";
-                passField.focus();
-            }
-        } catch (err) {
-            console.error("Re-auth Error:", err);
-            authStatus.innerText = "❌ Connection error.";
-            authStatus.style.color = "red";
-        } finally {
-            confirmBtn.disabled = false;
-            confirmBtn.innerText = "Submit";
+
+                confirmBtn.disabled = true;
+                //confirmBtn.innerText = "Verifying...";
+                authStatus.innerText = "Verifying...";
+                authStatus.style.color = "#0078d4";
+
+                try {
+                    const response = await fetch(`https://${rawAddress}/apilogin`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username: user, password: pass })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        await setWorkbookSetting(6, data.access_token);
+                    
+                        passField.value = "";
+                        authStatus.innerText = ""; // Clear internal status
+                        hidePanel();
+                    
+                        if (authCallback) {
+                            // Switch back to main status since the panel is now hidden
+                            mainStatus.innerText = "✅ Verified. Resuming task...";
+                            mainStatus.style.color = "green";
+                            await authCallback();
+                            authCallback = null;
+                        }
+                    } else {
+                        authStatus.innerText = "❌ Incorrect password. Try again.";
+                        authStatus.style.color = "red";
+                        passField.value = "";
+                        passField.focus();
+                    }
+                } catch (err) {
+                    console.error("Re-auth Error:", err);
+                    authStatus.innerText = "❌ Connection error.";
+                    authStatus.style.color = "red";
+                } finally {
+                    confirmBtn.disabled = false;
+                    confirmBtn.innerText = "Submit";
+                }
+            };
         }
-    };
-}
         
         if (closeBtn) {
-    closeBtn.onclick = () => hidePanel(true); // Pass true for cancellation
-}
-
-if (authOverlay) {
-    authOverlay.onclick = (e) => {
-        if (e.target === authOverlay) {
-            hidePanel(true); // Pass true for cancellation
+            closeBtn.onclick = () => hidePanel(true); // Pass true for cancellation
         }
-    };
-}
+
+        if (authOverlay) {
+            authOverlay.onclick = (e) => {
+                if (e.target === authOverlay) {
+                    hidePanel(true); // Pass true for cancellation
+                }
+            };
+        }
         
         // --- SYNC CLASS UPDATES ---
         if (syncUpdatesBtn) {
@@ -147,10 +157,153 @@ if (authOverlay) {
 
         if (disconnectBtn) disconnectBtn.onclick = handleDisconnect;
         if (syncBtn) syncBtn.onclick = refreshCalendar;
+    
+
+        const manualRawToggle = document.getElementById("manual-raw-toggle");
+        const manualAutoToggle = document.getElementById("manual-auto-toggle");
+
+if (manualRawToggle && manualAutoToggle) {
+const handleGradeToggle = async (mode, activeToggle, otherToggle) => {
+    const status = document.getElementById("status-message");
+    
+    await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet();
+        const props = sheet.customProperties;
+        
+        // Retrieve batchid and sheetType from the sheet itself
+        const bProp = props.getItemOrNullObject("batchid");
+        const tProp = props.getItemOrNullObject("sheetType");
+        
+        bProp.load("value");
+        tProp.load("value");
+        await context.sync();
+
+        // REPLACEMENT VALIDATION: Use Custom Properties
+        if (bProp.isNullObject || tProp.value !== "gradesheet_record") {
+            status.innerText = "⚠️ This action is only available on a valid Gradesheet.";
+            status.style.color = "orange";
+            activeToggle.checked = !activeToggle.checked; // Revert UI
+            return;
+        }
+
+        const batchId = bProp.value;
+        const targetRange = mode === "RAW" ? "N20:Q51" : "C20:K51";
+
+        // DIALOG LOGIC: Triggered when UNCHECKING
+        if (!activeToggle.checked) {
+            const confirmed = await showConfirmDialog(
+                `⚠️ Restore Automatic Calculations?`,
+                `This will clear your existing manual grades in the ${mode} range to be replaced by automatic formulas. This cannot be undone. Continue?`
+            );
+            
+            if (!confirmed) {
+                activeToggle.checked = true;
+                return;
+            }
+        }
+
+        if (activeToggle.checked) otherToggle.checked = false;
+
+        status.innerText = "Processing...";
+        status.style.color = "#43484c";
+
+        try {
+            await injectSheetFormulas(context, sheet, "Gradesheet", batchId);
+            sheet.getRange("N20:Q51").format.fill.color = "#ffffff"
+            sheet.getRange("C20:K51").format.fill.color = "#ffffff"
+            if (activeToggle.checked) {
+                // User enabled Manual Mode: Clear for fresh input[cite: 3]
+                sheet.getRange(targetRange).clear(Excel.ClearApplyTo.contents);
+                sheet.getRange(targetRange).format.fill.color = "#eff6fd";
+                status.innerText = `✅ Manual ${mode} mode enabled.`;
+            } else {
+                
+                status.innerText = `✅ Automatic calculations restored.`;
+            }
+
+            await context.sync();
+            status.style.color = "green";
+        } catch (err) {
+            status.innerText = "❌ Error: " + err.message;
+            status.style.color = "red";
+            activeToggle.checked = !activeToggle.checked;
+        }
+    });
+};
+
+    manualRawToggle.onchange = () => handleGradeToggle("RAW", manualRawToggle, manualAutoToggle);
+    manualAutoToggle.onchange = () => handleGradeToggle("GP", manualAutoToggle, manualRawToggle);
+}
+        
     }
+
 });
 
 // --- HELPER FUNCTIONS (Outside Office.onReady for access) ---
+
+async function onSheetActivated(event) {
+    const manualRawToggle = document.getElementById("manual-raw-toggle");
+    const manualAutoToggle = document.getElementById("manual-auto-toggle");
+
+    await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(event.worksheetId);
+        const props = sheet.customProperties;
+        
+        const tProp = props.getItemOrNullObject("sheetType");
+        tProp.load("value");
+        await context.sync();
+
+        // Check if we are on a Gradesheet
+        const isGradesheet = !tProp.isNullObject && tProp.value === "gradesheet_record";
+
+        if (manualRawToggle && manualAutoToggle) {
+            // Enable toggles only if on a gradesheet, otherwise disable
+            manualRawToggle.disabled = !isGradesheet;
+            manualAutoToggle.disabled = !isGradesheet;
+
+            if (isGradesheet) {
+                const rangeRaw = sheet.getRange("N21");
+                const rangeGP = sheet.getRange("C21");
+
+                rangeRaw.load("formulas");
+                rangeGP.load("formulas");
+                await context.sync();
+
+                // Sync the UI checkmarks with the existing cell state
+                const rawFormulaValue = rangeRaw.formulas[0][0];
+                const gpFormulaValue = rangeGP.formulas[0][0];
+
+                manualRawToggle.checked = !String(rawFormulaValue).startsWith("=");
+                manualAutoToggle.checked = !String(gpFormulaValue).startsWith("=");
+            } else {
+                // Clear checks if on a non-gradesheet to avoid confusion
+                manualRawToggle.checked = false;
+                manualAutoToggle.checked = false;
+            }
+        }
+    });
+}
+async function findSheetByMetadata(context, batchId, sheetType) {
+    const worksheets = context.workbook.worksheets;
+    worksheets.load("items/name, items/customProperties");
+    await context.sync();
+
+    for (let sheet of worksheets.items) {
+        const bProp = sheet.customProperties.getItemOrNullObject("batchid");
+        const tProp = sheet.customProperties.getItemOrNullObject("sheetType");
+        
+        bProp.load("value");
+        tProp.load("value");
+        await context.sync();
+
+        if (!bProp.isNullObject && !tProp.isNullObject) {
+            if (String(bProp.value) === String(batchId) && tProp.value === sheetType) {
+                return sheet;
+            }
+        }
+    }
+    return null;
+}
 
 function showAuthOverlay(onSuccessCallback) {
     const authOverlay = document.getElementById('auth-overlay');
@@ -556,4 +709,25 @@ async function mergeMonthsLogic(context, sheet) {
     await context.sync();
 }
 
+function showConfirmDialog(title, message) {
+    const overlay = document.getElementById('confirm-overlay');
+    const titleEl = document.getElementById('confirm-title');
+    const bodyEl = document.getElementById('confirm-body');
+    const okBtn = document.getElementById('dialog-ok');
+    const cancelBtn = document.getElementById('dialog-cancel');
 
+    titleEl.innerText = title;
+    bodyEl.innerText = message;
+    overlay.style.display = 'flex';
+
+    return new Promise((resolve) => {
+        okBtn.onclick = () => {
+            overlay.style.display = 'none';
+            resolve(true);
+        };
+        cancelBtn.onclick = () => {
+            overlay.style.display = 'none';
+            resolve(false);
+        };
+    });
+}

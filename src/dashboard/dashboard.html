@@ -37,7 +37,7 @@
         <span class="ms-Button-label">Sync Attendance</span>
     </button>
     <button id="sync-classupdates" class="ms-Button ms-Button--primary" style="width: 100%;">
-        <span class="ms-Button-label">Sync Class Updates</span>
+        <span class="ms-Button-label">Download Class Updates</span>
     </button>
 </div>
 
@@ -49,15 +49,29 @@
     </div>
 
     <div class="section group-box" style="border: 1px solid #edebe9; padding: 15px; margin-top: 20px; border-radius: 2px;">
-        <label class="ms-Label" style="font-weight: 600; margin-bottom: 10px; display: block;">Gradesheet Options</label>
+        <label class="ms-Label" style="font-weight: 600; margin-bottom: 10px; display: block;">Gradesheet Input Options</label>
         
         <div class="option-item" style="margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="ms-fontSize-m">Manually Input Grades</span>
-                <input type="checkbox" id="manual-toggle">
+                <span class="ms-fontSize-m">Manual Raw Grades Input</span>
+                <input type="checkbox" id="manual-raw-toggle">
             </div>
             <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
-                Check this enter to final grades in the gradesheet. Uncheck to automatically calculate from the provided class record.
+                Use this to automatically calculate grade point with manually entered raw grades
+            </p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="ms-fontSize-m">Manual Grade Point (G.P.) Input</span>
+                <input type="checkbox" id="manual-auto-toggle">
+            </div>
+            <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
+                Remove gradesheet formulas and manually enter Grade Point for submission.
+            </p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="ms-fontSize-m">Allow only valid Grade Point (G.P.)</span>
+                <input type="checkbox" id="valid-grade-toggle" checked>
+            </div>
+            <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
+                Ensure only the official grade points are accepted. Uncheck to override the values.
             </p>
         </div>
 
@@ -101,6 +115,22 @@
             <button id="confirm-submit" class="ms-Button ms-Button--hero">
                 <span class="ms-Button-label">Submit</span>
             </button>
+        </div>
+    </div>
+</div>
+<div id="confirm-overlay" class="auth-overlay" style="align-items: center; justify-content: center;">
+    <div class="auth-panel" style="width: 80%; border-radius: 4px; transform: none; transition: none;">
+        <div class="panel-header">
+            <span class="ms-fontWeight-semibold" id="confirm-title">Confirm Action</span>
+        </div>
+        <div class="panel-body">
+            <p id="confirm-body" class="ms-fontSize-s" style="margin-bottom: 20px; line-height: 1.4;">
+                Are you sure you want to proceed?
+            </p>
+            <div style="display: flex; gap: 8px;">
+                <button id="dialog-ok" class="ms-Button ms-Button--primary" style="flex: 1;">OK</button>
+                <button id="dialog-cancel" class="ms-Button" style="flex: 1;">Cancel</button>
+            </div>
         </div>
     </div>
 </div>

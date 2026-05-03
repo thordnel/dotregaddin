@@ -366,3 +366,5 @@ async function checkCoreTablesExist() {
         return !enrollmentTable.isNullObject;
     });
 }
+
+

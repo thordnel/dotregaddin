@@ -1,0 +1,17 @@
+1. Several global settings maybe not return in case addin task was incomplete due to technical problems: Calculation. Calculation is by default auto. To enhance performce an this calculation is turn off by the addin. Just turn on the Auto back by going to settings. In newer version of office this can be conveniently search.
+
+
+Warning!
+Requires DOT.REG system.
+
+
+Nothing is written on the download tables.
+They are referecnes only.
+Must be updated if required, eg if trainees listing chnages (dropped, removed_), errors in name corrcetion
+
+
+Updating remote record:
+
+Attendance sync; Upload and download
+Class Update: Download only
+Submit Gradesheet: Upload only (post)

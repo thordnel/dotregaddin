@@ -634,7 +634,7 @@ async function downloadCRperBatch(fileUrl, sheetNamesCommaSeparated, batches) {
                     newlyAddedSheet.customProperties.add("batchid", String(batchId));
                     newlyAddedSheet.customProperties.add("sheetType", `${baseName.toLowerCase()}_record`);
                     
-                    await injectSheetFormulas(newlyAddedSheet, baseName, batchId)
+                    await injectSheetFormulas(context,newlyAddedSheet, baseName, batchId)
                     await context.sync();
                 }
             }
@@ -662,10 +662,14 @@ function arrayBufferToBase64(buffer) {
  * Centralized place for all workbook formulas.
  * Prevents #REF! errors by re-applying logic after tables are rebuilt.
  */
-async function injectSheetFormulas(sheet, baseName, batchId) {
+async function injectSheetFormulas(context,sheet, baseName, batchId) {
+    let startRow = 21;
+    let studentRowsCount = 30; 
+    let formulaPayload, uniqueName, cell, subjectIdRange, currentRow, subjectId, allNames;
     switch (baseName) {        
         case "Attendance":
             sheet.getRange("B6").values = [[batchId]]; 
+            sheet.getRange("F10").values = [[`=XLOOKUP(1,(TranscriptTab[BatchID]=B6)*(TranscriptTab[instructorid]=Settings!B3),TranscriptTab[subjectno])`]]; 
             sheet.getRange("A5").formulas = [[`=XLOOKUP(B6, BatchlistTab[batchid], BatchlistTab[batchname])`]];
             sheet.getRange("A15").formulas = [[`=FILTER(HSTACK(EnrollmentTab[idnumber], LEFT(EnrollmentTab[gender], 1), EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(AND(EnrollmentTab[middlename]<>".", EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=B6)`]];
             sheet.getRange("B7").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
@@ -673,24 +677,163 @@ async function injectSheetFormulas(sheet, baseName, batchId) {
             sheet.getRange("B9").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=B6) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];
             sheet.getRange("B10").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=B6) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];
             sheet.getRange("E8").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[trainingstart])`]];
+            sheet.getRange("H12").formulas = [[`=E8`]] 
             sheet.getRange("E12").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[midtermexamdate])`]];
             sheet.getRange("E9").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[trainingend])`]];
             sheet.getRange("F12").formulas = [[`=XLOOKUP(B6, batchlisttab[batchid], batchlisttab[finaltermexamdate])`]];
+
+            //attendance calculator
+            sheet.getRange("H1").formulas = [[`=IFERROR(LEFT(ADDRESS(1,MATCH(E8,H12:IW12,0)+COLUMN(H12)-1,4),LEN(ADDRESS(1,MATCH(E8,H12:IW12,0)+COLUMN(H12)-1,4))-1)&"13",H12)`]]
+            sheet.getRange("I1").formulas = [[`=IFERROR(LEFT(ADDRESS(1,MATCH(E12,H12:IW12,0)+COLUMN(H12)-1,4),LEN(ADDRESS(1,MATCH(E12,H12:IW12,0)+COLUMN(H12)-1,4))-1)&"13",H12)`]]
+            sheet.getRange("J1").formulas = [[`=SUBSTITUTE(ADDRESS(1,COLUMN(INDIRECT(H1)),4),1,"")`]]
+            sheet.getRange("K1").formulas = [[`=SUBSTITUTE(ADDRESS(1,COLUMN(INDIRECT(I1)),4),1,"")`]]
+            sheet.getRange("H2").formulas = [[`=IFERROR(LEFT(ADDRESS(1,MATCH(E12+1,H12:IW12,0)+COLUMN(H12)-1,4),LEN(ADDRESS(1,MATCH(E12+1,H12:IW12,0)+COLUMN(H12)-1,4))-1)&"13",H12)`]]
+            sheet.getRange("I2").formulas = [[`=IFERROR(LEFT(ADDRESS(1,MATCH(E9,H12:IW12,0)+COLUMN(H12)-1,4),LEN(ADDRESS(1,MATCH(E9,H12:IW12,0)+COLUMN(H12)-1,4))-1)&"13",H12)`]]
+            sheet.getRange("J2").formulas = [[`=SUBSTITUTE(ADDRESS(1,COLUMN(INDIRECT(H2)),4),"1","")`]]
+            sheet.getRange("K2").formulas = [[`=SUBSTITUTE(ADDRESS(1,COLUMN(INDIRECT(I2)),4),1,"")`]]          
+            sheet.getRange("E13").formulas = [[`=SUMPRODUCT((INDIRECT(H1):INDIRECT(I1)=1)*(INDIRECT(H1):INDIRECT(I1)<>""))`]]
+            sheet.getRange("F13").formulas = [[`=SUMPRODUCT((INDIRECT(H2):INDIRECT(I2)=1)*(INDIRECT(H2):INDIRECT(I2)<>""""))`]]  
+
+            startRow = 15;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                `=IF(A${currentRow}<>"",SUMPRODUCT((INDIRECT(H$1):INDIRECT(I$1)=1)*(INDIRECT(J$1&ROW()):INDIRECT(K$1&ROW())<>"")),0)`,
+                `=IF(A${currentRow}<>"",SUMPRODUCT((INDIRECT(H$2):INDIRECT(I$2)=1)*(INDIRECT(J$2&ROW()):INDIRECT(K$2&ROW())<>"")),0)`
+                ];
+            });
+            sheet.getRange(`E${startRow}:F${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+
+            startRow = 15;
+            subjectIdRange = sheet.getRange("F10");
+            context.workbook.application.calculate("Full");
+            subjectIdRange.load("values");
+            allNames = context.workbook.names;
+            allNames.load("items/name");
+            await context.sync();
+            subjectId = subjectIdRange.values[0][0];
+            if (typeof subjectId === "string" && subjectId.startsWith("#")) {
+                throw new Error("Subject ID not found yet. Please ensure TranscriptTab is populated.");
+                }
+            const AMpref = `AM_${batchId}_${subjectId}_`;
+            const AFpref = `AF_${batchId}_${subjectId}_`;
+            allNames.items
+                .filter(n => n.name.startsWith(AMpref))
+                .forEach(n => n.delete());
+            allNames.items
+                .filter(n => n.name.startsWith(AFpref))
+                .forEach(n => n.delete());            
+            for (let i = 0; i < studentRowsCount; i++) {
+                currentRow = startRow  + i;
+                uniqueNameAM = `${AMpref}${currentRow+6}`;
+                uniqueNameAF = `${AFpref}${currentRow+6}`;
+                cellAM = sheet.getRange(`E${currentRow}`);
+                cellAF = sheet.getRange(`F${currentRow}`);
+                allNames.add(uniqueNameAM, cellAM);
+                allNames.add(uniqueNameAF, cellAF);
+            }
+            allNames.add(`AM_${batchId}_${subjectId}_18`, sheet.getRange("E13"));
+            allNames.add(`AF_${batchId}_${subjectId}_18`, sheet.getRange("F13"));
+            await context.sync();
+
+            console.log("Reconstructed formulas in attendance tab");
             break;
         case "Gradesheet":
             sheet.getRange("K15").values = [[batchId]]; 
-            sheet.getRange("B20").formulas = [[`=FILTER(HSTACK(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(AND(EnrollmentTab[middlename]<>".", EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=K15)`]];
+            sheet.getRange("M12").values = [[`=XLOOKUP(1,(TranscriptTab[BatchID]=K15)*(TranscriptTab[instructorid]=Settings!B3),TranscriptTab[subjectno])`]]; 
+            sheet.getRange("K14").values = [[`=COUNTIF(B20:B51, "?*")`]]; 
+            sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(AND(EnrollmentTab[middlename]<>".", EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=K15)`]];
+            sheet.getRange("M21").formulas = [[`=FILTER(EnrollmentTab[recordid], EnrollmentTab[batchid]=K15)`]];
             sheet.getRange("A8").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=K15) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];
             sheet.getRange("A11").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=K15) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];
             sheet.getRange("C8").formulas = [[`=XLOOKUP(K15, batchlisttab[batchid], batchlisttab[year])`]];
             sheet.getRange("C11").formulas = [[`=XLOOKUP(K15, batchlisttab[batchid], batchlisttab[period])`]];
             sheet.getRange("C14").formulas = [[`=XLOOKUP(XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[adviser]), InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
-            sheet.getRange("I8").formulas = [[`=XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[batchname])`]];
-            sheet.getRange("I11").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
+            sheet.getRange("H8").formulas = [[`=UPPER(XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[course])) & " (" & MID(K13, SEARCH("Batch", K13), SEARCH(" (", K13) - SEARCH("Batch", K13)) & ")"`]];
+            sheet.getRange("K13").formulas = [[`=XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[batchname])`]]
+            sheet.getRange("H11").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
+            sheet.getRange("C20:H50").clear(Excel.ClearApplyTo.contents);
+            sheet.getRange("A20:A50").clear(Excel.ClearApplyTo.contents);
+            sheet.getRange("A20:S20").clear(Excel.ClearApplyTo.contents);
+            await context.sync();
+
+            //gradesheet GP formulas
+            startRow = 21;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                `=if(B${currentRow}<>"",LOOKUP(N${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
+                `=if(B${currentRow}<>"",LOOKUP(O${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
+                `=if(B${currentRow}<>"",LOOKUP(P${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
+                `=if(B${currentRow}<>"",LOOKUP(Q${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
+                `=if(B${currentRow}<>"",LOOKUP(R${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
+                `=if(B${currentRow}<>"",LOOKUP(S${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`
+                ];
+            });
+            sheet.getRange(`C${startRow}:H${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+
+            //gradesheet raw grades formulas
+            subjectIdRange = sheet.getRange("M12");
+            context.workbook.application.calculate("Full");
+            subjectIdRange.load("values");
+            allNames = context.workbook.names;
+            allNames.load("items/name");
+            await context.sync();
+            subjectId = subjectIdRange.values[0][0];
+            if (typeof subjectId === "string" && subjectId.startsWith("#")) {
+                throw new Error("Subject ID not found yet. Please ensure TranscriptTab is populated.");
+                }
+            startRow = 21;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                `=IFERROR(MT_${batchId}_${subjectId}_${currentRow},0)`,
+                `=IFERROR(ML_${batchId}_${subjectId}_${currentRow},0)`,
+                `=IFERROR(FT_${batchId}_${subjectId}_${currentRow},0)`,
+                `=IFERROR(FL_${batchId}_${subjectId}_${currentRow},0)`
+                ];
+            });
+            sheet.getRange(`N${startRow}:Q${startRow + studentRowsCount - 1}`).formulas = formulaPayload;            
+            
+            startRow = 21;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                `=IFERROR(MT_${batchId}_${subjectId}_${currentRow},0)`,
+                `=IFERROR(ML_${batchId}_${subjectId}_${currentRow},0)`,
+                `=IFERROR(FT_${batchId}_${subjectId}_${currentRow},0)`,
+                `=IFERROR(FL_${batchId}_${subjectId}_${currentRow},0)`
+                ];
+            });
+            sheet.getRange(`N${startRow}:Q${startRow + studentRowsCount - 1}`).formulas = formulaPayload; 
+
+            //raw total (40+60%)
+            startRow = 21;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                    `=iferror(if(B${currentRow}<>"",(N${currentRow}*N19)+(P${currentRow}*P19),""),0)`,
+                    `=iferror(if(B${currentRow}<>"",(O${currentRow}*O19)+(Q${currentRow}*Q19),""),0)`
+                ];
+            });
+            sheet.getRange(`R${startRow}:S${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+
+            //numbering
+            startRow = 21;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [`=IF(B${currentRow}<>"",ROW()-20 & ".","")`];
+            });
+            sheet.getRange(`A${startRow}:A${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+            
+            console.log("Reconstructed formulas in gradesheet tab");
             break;
+        
         case "Midterm":
             sheet.getRange("I12").values = [[batchId]]; 
-            sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT(EnrollmentTab[gender], 1), EnrollmentTab[idnumber], EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname]), EnrollmentTab[batchid]=I12)`]];
+            sheet.getRange("I13").values = [[`=XLOOKUP(1,(TranscriptTab[BatchID]=I12)*(TranscriptTab[instructorid]=Settings!B3),TranscriptTab[subjectno])`]]; 
+            sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT(EnrollmentTab[gender], 1), EnrollmentTab[idnumber], EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF((EnrollmentTab[middlename]<>".")*(EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=I12)`]]; 
+            sheet.getRange("BR21").formulas = [[`=FILTER(EnrollmentTab[recordid], EnrollmentTab[batchid]=I12)`]]; 
             sheet.getRange("C6").formulas = [[`=XLOOKUP(I12, batchlisttab[batchid], batchlisttab[year])`]];
             sheet.getRange("C7").formulas = [[`=XLOOKUP(I12, batchlisttab[batchid], batchlisttab[period])`]];    
             sheet.getRange("C8").values = [[`MIDTERM`]];    
@@ -700,10 +843,82 @@ async function injectSheetFormulas(sheet, baseName, batchId) {
             sheet.getRange("C12").formulas = [[`=XLOOKUP(I12, BatchlistTab[batchid], BatchlistTab[batchname])`]];    
             sheet.getRange("C13").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=I12) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode]) & " - " & UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=I12) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];   
             sheet.getRange("C14").formulas = [[`=IF(XLOOKUP(XLOOKUP(Settings!B3& I12, ScheduleTab[instructorid] & ScheduleTab[batchid], ScheduleTab[subjectno]),SubjectTab[subjectno],SubjectTab[labhours])<1,"TOOL SUBJECT","CORE SUBJECT")`]]
-            break;            
+            sheet.getRange("K18").values = 100;
+            sheet.getRange("Z18").values = 100;
+            sheet.getRange("AI18").values = 100;
+            sheet.getRange("AL18").values = 100;
+            sheet.getRange("AX18").values = 100;
+            sheet.getRange("BH18").values = 100;
+            sheet.getRange("BQ18").values = 100;
+            
+
+            
+            startRow = 21;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                    `=IF(E${currentRow}="Failed",1,(K${currentRow}*$N$8+Z${currentRow}*$N$9+AI${currentRow}*$N$10+AL${currentRow}*$N$11))`,
+                    `=LOOKUP(F${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`,
+                    `=IF(E${currentRow}="Failed",1,AX${currentRow}*$AR$8+BH${currentRow}*$AR$9+BQ${currentRow}*$AR$10)`,
+                    `=LOOKUP(H${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`
+                ];
+            });
+            sheet.getRange(`F${startRow}:I${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+          
+            startRow = 21;
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [`=IF(B${currentRow}<>"",ROW()-20 & ".","")`];
+            });
+            sheet.getRange(`A${startRow}:A${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+
+            //setting named ranges for Midterm Lec and Lab
+            startRow = 21;
+            subjectIdRange = sheet.getRange("I13");
+            context.workbook.application.calculate("Full");
+            subjectIdRange.load("values");
+            allNames = context.workbook.names;
+            allNames.load("items/name");
+            await context.sync();
+            subjectId = subjectIdRange.values[0][0];
+            if (typeof subjectId === "string" && subjectId.startsWith("#")) {
+                throw new Error("Subject ID not found yet. Please ensure TranscriptTab is populated.");
+                }
+            const MTpref = `MT_${batchId}_${subjectId}_`;
+            const MLpref = `ML_${batchId}_${subjectId}_`;
+            allNames.items
+                .filter(n => n.name.startsWith(MTpref))
+                .forEach(n => n.delete());
+            allNames.items
+                .filter(n => n.name.startsWith(MLpref))
+                .forEach(n => n.delete());            
+            for (let i = 0; i < studentRowsCount; i++) {
+                currentRow = startRow + i;
+                uniqueNameMT = `${MTpref}${currentRow}`;
+                uniqueNameML = `${MLpref}${currentRow}`;
+                cellMT = sheet.getRange(`F${currentRow}`);
+                cellML = sheet.getRange(`H${currentRow}`);
+                allNames.add(uniqueNameMT, cellMT);
+                allNames.add(uniqueNameML, cellML);
+                }
+            await context.sync();
+
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [`=IFERROR(AM_${batchId}_${subjectId}_${currentRow},0)`];
+            });
+            sheet.getRange(`J${startRow}:J${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+            sheet.getRange("J18").formulas = [[`=iferror(AM_${batchId}_${subjectId}_18,0)`]]
+
+
+            console.log("Reconstructed formulas in midterm tab");
+            break;
+                
         case "FinalTerm":
             sheet.getRange("I12").values = [[batchId]]; 
-            sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT(EnrollmentTab[gender], 1), EnrollmentTab[idnumber], EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname]), EnrollmentTab[batchid]=I12)`]];
+            sheet.getRange("I13").values = [[`=XLOOKUP(1,(TranscriptTab[BatchID]=I12)*(TranscriptTab[instructorid]=Settings!B3),TranscriptTab[subjectno])`]]; 
+            sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(LEFT(EnrollmentTab[gender], 1), EnrollmentTab[idnumber], EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF((EnrollmentTab[middlename]<>".")*(EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=I12)`]];
+            sheet.getRange("BR21").formulas = [[`=FILTER(EnrollmentTab[recordid], EnrollmentTab[batchid]=I12)`]];
             sheet.getRange("C6").formulas = [[`=XLOOKUP(I12, batchlisttab[batchid], batchlisttab[year])`]];
             sheet.getRange("C7").formulas = [[`=XLOOKUP(I12, batchlisttab[batchid], batchlisttab[period])`]];    
             sheet.getRange("C8").values = [[`FINAL TERM`]];    
@@ -713,11 +928,78 @@ async function injectSheetFormulas(sheet, baseName, batchId) {
             sheet.getRange("C12").formulas = [[`=XLOOKUP(I12, BatchlistTab[batchid], BatchlistTab[batchname])`]];    
             sheet.getRange("C13").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=I12) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode]) & " - " & UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=I12) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];   
             sheet.getRange("C14").formulas = [[`=IF(XLOOKUP(XLOOKUP(Settings!B3& I12, ScheduleTab[instructorid] & ScheduleTab[batchid], ScheduleTab[subjectno]),SubjectTab[subjectno],SubjectTab[labhours])<1,"TOOL SUBJECT","CORE SUBJECT")`]];
+            startRow = 21;
+            
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                    `=IF(E${currentRow}="Failed",1,(K${currentRow}*$N$8+Z${currentRow}*$N$9+AI${currentRow}*$N$10+AL${currentRow}*$N$11))`,
+                    `=LOOKUP(F${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`,
+                    `=IF(E${currentRow}="Failed",1,AX${currentRow}*$AR$8+BH${currentRow}*$AR$9+BQ${currentRow}*$AR$10)`,
+                    `=LOOKUP(H${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`
+                ];
+            });
+            sheet.getRange(`F${startRow}:I${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+
+
+
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [
+                    `=IF(B${currentRow}<>"",ROW()-20 & ".","")`
+                ];
+            });
+            sheet.getRange(`A${startRow}:A${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+
+            //setting named ranges for Midterm Lec and Lab
+            startRow = 21;
+            subjectIdRange = sheet.getRange("I13");
+            context.workbook.application.calculate("Full");
+            subjectIdRange.load("values");
+            allNames = context.workbook.names;
+            allNames.load("items/name");
+            await context.sync();
+            subjectId = subjectIdRange.values[0][0];
+            if (!subjectId || typeof subjectId === "string" && (subjectId.startsWith("#") || subjectId === "")) {
+                throw new Error(`Invalid Subject ID (${subjectId}) in FinalTerm. Sync failed.`);
+            }
+            const FTpref = `FT_${batchId}_${subjectId}_`;
+            const FLpref = `FL_${batchId}_${subjectId}_`;
+            allNames.items
+                .filter(n => n.name.startsWith(FTpref))
+                .forEach(n => n.delete());
+            allNames.items
+                .filter(n => n.name.startsWith(FLpref))
+                .forEach(n => n.delete());            
+            for (let i = 0; i < studentRowsCount; i++) {
+                currentRow = startRow + i;
+                uniqueNameFT = `${FTpref}${currentRow}`;
+                uniqueNameFL = `${FLpref}${currentRow}`;
+                cellFT = sheet.getRange(`F${currentRow}`);
+                cellFL = sheet.getRange(`H${currentRow}`);
+                allNames.add(uniqueNameFT, cellFT);
+                allNames.add(uniqueNameFL, cellFL);
+                console.log(uniqueNameFT);
+                }
+            await context.sync();
+
+            formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
+                currentRow = startRow + i;
+                return [`=IFERROR(AF_${batchId}_${subjectId}_${currentRow},0)`];
+            });
+            sheet.getRange(`J${startRow}:J${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
+            sheet.getRange("J18").formulas = [[`=iferror(AF_${batchId}_${subjectId}_18,0)`]]
+
+            console.log("Reconstructed formulas in final term tab");
             break;
         case "TraineeList":
             sheet.getRange("F8").values = [[batchId]]; 
-            sheet.getRange("B16").formulas = [[`=FILTER(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname], (EnrollmentTab[batchid]=F8)*(EnrollmentTab[gender]="Male"),"")`]];
-            sheet.getRange("E16").formulas = [[`=FILTER(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname], (EnrollmentTab[batchid]=F8)*(EnrollmentTab[gender]="Female"),"")`]];
+            sheet.getRange("B16").formulas = [[
+                `=FILTER(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF((EnrollmentTab[middlename]<>".")*(EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", ""), (EnrollmentTab[batchid]=F8)*(EnrollmentTab[gender]="Male"), "")`
+            ]];
+            sheet.getRange("E16").formulas = [[
+                `=FILTER(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF((EnrollmentTab[middlename]<>".")*(EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", ""), (EnrollmentTab[batchid]=F8)*(EnrollmentTab[gender]="Female"), "")`
+            ]];
             sheet.getRange("C8").formulas = [[`=XLOOKUP(F8, BatchlistTab[batchid], BatchlistTab[batchname])`]];
             sheet.getRange("C9").formulas = [[`=UPPER(XLOOKUP(F8, batchlisttab[batchid], batchlisttab[course]))`]];  
             sheet.getRange("C10").formulas = [[`=TEXT(XLOOKUP(F8, BatchlistTab[batchid], BatchlistTab[trainingstart]),"dd MMM YYYY") & " - " & TEXT(XLOOKUP(F8, BatchlistTab[batchid], BatchlistTab[trainingend]),"dd MMM YYYY")`]];
@@ -725,7 +1007,7 @@ async function injectSheetFormulas(sheet, baseName, batchId) {
             sheet.getRange("C12").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=F8) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];   
             sheet.getRange("F10").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
             sheet.getRange("F11").formulas = [[`=XLOOKUP(XLOOKUP(F8, BatchlistTab[batchid], BatchlistTab[adviser]), InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
-
+            console.log("Reconstructed formulas in traineeslist tab");
             
             break;
     }            
@@ -775,7 +1057,7 @@ async function reapplyAllFormulas() {
                 
                 // Ensure injectSheetFormulas uses the specific 'item.sheet' 
                 // passed into it, which is tied to this specific 'context'.
-                await injectSheetFormulas(item.sheet, baseName, batchId);
+                await injectSheetFormulas(context,item.sheet, baseName, batchId);
             }
         }
 
