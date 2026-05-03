@@ -10,7 +10,7 @@
   <HighResolutionIconUrl DefaultValue="https://thordnel.github.io/dotregaddin/assets/64.png"/>
   <SupportUrl DefaultValue="https://thordnel.github.io/dotregaddin/help"/>
   <AppDomains>
-    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>https://thordnel.github.io/</AppDomain>
     <AppDomain>https://node.tesdadvts.org</AppDomain>
     <AppDomain>https://macdemo.tesdadvts.org</AppDomain>
   </AppDomains>
