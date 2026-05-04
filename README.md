@@ -22,6 +22,11 @@ Microsoft Reviewers and prospective users can evaluate the add-in using our dedi
 * **Username:** `demo`
 * **Password:** `demo`
 
+## 🫵 Operational Instruction (demo):
+1. Select a batch available for the instructor.
+2. Inspect or select any of the shown sheets for the selected batch: eg. Attendance, Gradesheet, Midterm, Final, Trainees List
+3. 
+
 ## ⚙️ Core Architecture & Functions
 
 The architecture utilizes standard Office Web Add-in components to deliver functionality securely and efficiently:
@@ -32,7 +37,7 @@ The architecture utilizes standard Office Web Add-in components to deliver funct
 * **Sync Engine** (`syncEngine.js`): Manages the bidirectional data transfer between the host document and the DOT.REG backend, ensuring data integrity.
 * **Add-in Commands** (`commands.js`): Executes specific ribbon-based actions without requiring the full taskpane to be open, optimizing the user experience.
 
-## 🛡️ Data Privacy and Transparency (Reviewer Reference)
+## 🛡️ Data Privacy and Transparency
 
 To comply with strict data privacy standards and Microsoft Store transparency requirements, the add-in strictly adheres to the following data handling protocols:
 
@@ -46,6 +51,7 @@ To comply with strict data privacy standards and Microsoft Store transparency re
 * **Backend Requirement:** The add-in functions solely as a client interface and holds no utility without an active, properly configured DOT.REG system backend.
 * **Demo Latency:** As mentioned, the demo server incurs a startup delay if accessed from a cold/sleep state.
 * **Network Dependency:** Continuous internet/network access is mandatory for the sync engine to maintain data parity with the user's server.
+
 
 ---
 
