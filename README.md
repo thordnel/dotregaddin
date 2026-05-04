@@ -1,72 +1,44 @@
-# Build Excel add-ins using Office Add-ins Development Kit
+# DOT.REG Web Add-in
 
-Excel add-ins are integrations built by third parties into Excel by using [Excel JavaScript API](https://learn.microsoft.com/en-us/office/dev/add-ins/reference/overview/excel-add-ins-reference-overview) and [Office Platform capabilities](https://learn.microsoft.com/en-us/office/dev/add-ins/overview/office-add-ins).
+[![Microsoft Store](https://img.shields.io/badge/Available_in-Microsoft_Store-blue.svg)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](#) ## Overview
+The **DOT.REG Web Add-in** provides a secure, seamless interface between the host application (Microsoft Office) and the user's dedicated DOT.REG system. It is designed exclusively for consumers equipped with an existing DOT.REG backend configuration. 
 
-## How to run this project
+To eliminate sideloading requirements and ensure a streamlined, secure installation process for end-users, this add-in is published directly via the Microsoft Store.
 
-### Prerequisites
+## 🔐 Authentication and Access
+Access to the add-in requires authentication through a password-protected gateway. The system validates credentials against the user's designated Registrar Server before granting access to the main dashboard.
 
-- Node.js (the latest LTS version). Visit the [Node.js site](https://nodejs.org/) to download and install the right version for your operating system. To verify that you've already installed these tools, run the commands `node -v` and `npm -v` in your terminal.
-- Office connected to a Microsoft 365 subscription. You might qualify for a Microsoft 365 E5 developer subscription through the [Microsoft 365 Developer Program](https://developer.microsoft.com/microsoft-365/dev-program), see [FAQ](https://learn.microsoft.com/office/developer-program/microsoft-365-developer-program-faq#who-qualifies-for-a-microsoft-365-e5-developer-subscription-) for details. Alternatively, you can [sign up for a 1-month free trial](https://www.microsoft.com/microsoft-365/try?rtc=1) or [purchase a Microsoft 365 plan](https://www.microsoft.com/microsoft-365/buy/compare-all-microsoft-365-products).
+### Demo Environment Configuration
+Microsoft Reviewers and prospective users can evaluate the add-in using our dedicated demo environment. 
 
-### Run the add-in using Office Add-ins Development Kit extension
+> **Note:** The demo server enters a sleep state during periods of inactivity. It may require a brief initialization time (up to a minute) upon the first login attempt.
 
-1. **Open the Office Add-ins Development Kit**
-    
-    In the **Activity Bar**, select the **Office Add-ins Development Kit** icon to open the extension.
+* **Registrar Server Name:** `demo`
+* **Username:** `demo`
+* **Password:** `demo`
 
-1. **Preview Your Office Add-in (F5)**
+## ⚙️ Core Architecture & Functions
+The architecture utilizes standard Office Web Add-in components to deliver functionality securely and efficiently:
 
-    Select **Preview Your Office Add-in(F5)** to launch the add-in and debug the code. In the Quick Pick menu, select the option **Excel Desktop (Edge Chromium)**.
+* **Authentication Gateway** (`login.html` / `login.js`): Handles secure user credential verification and establishes the active session.
+* **Taskpane Interface** (`taskpane.html` / `taskpane.js`): Operates as the primary side-panel UI within the host application, enabling direct interaction with DOT.REG records.
+* **Dashboard** (`dashboard.html` / `dashboard.js`): Provides a centralized view of system status, data summaries, and quick actions post-authentication.
+* **Sync Engine** (`syncEngine.js`): Manages the bidirectional data transfer between the host document and the DOT.REG backend, ensuring data integrity.
+* **Add-in Commands** (`commands.js`): Executes specific ribbon-based actions without requiring the full taskpane to be open, optimizing the user experience.
 
-    The extension then checks that the prerequisites are met before debugging starts. Check the terminal for detailed information if there are issues with your environment. After this process, the Excel desktop application launches and sideloads the add-in.
+## 🛡️ Data Privacy and Transparency (Reviewer Reference)
+To comply with strict data privacy standards and Microsoft Store transparency requirements, the add-in strictly adheres to the following data handling protocols:
 
-1. **Stop Previewing Your Office Add-in**
+* **Data Source:** The add-in interacts *strictly* with the user-defined DOT.REG Registrar Server.
+* **Data Usage:** Data retrieved from the server is used solely to populate the taskpane and dashboard. User inputs within the host application synchronize directly back to the specified server.
+* **Data Retention:** The add-in operates strictly as a pass-through client. It caches session data locally *only* during active use and comprehensively clears this data upon session termination or logout.
+* **Third-Party Sharing:** Zero data is transmitted to external analytics platforms, advertising networks, or unauthorized third-party servers. 
 
-    Once you are finished testing and debugging the add-in, select **Stop Previewing Your Office Add-in**. This closes the web server and removes the add-in from the registry and cache.
+## ⚠️ System Limitations
+* **Backend Requirement:** The add-in functions solely as a client interface and holds no utility without an active, properly configured DOT.REG system backend.
+* **Demo Latency:** As mentioned, the demo server incurs a startup delay if accessed from a cold/sleep state.
+* **Network Dependency:** Continuous internet/network access is mandatory for the sync engine to maintain data parity with the user's server.
 
-## Use the add-in project
-
-The add-in project that you've created contains code for a basic task pane add-in.
-
-## Explore the add-in code
-
-To explore an Office add-in project, you can start with the key files listed below.
-
-- The `./manifest.xml` file in the root directory of the project defines the settings and capabilities of the add-in.  <br>You can check whether your manifest file is valid by selecting **Validate Manifest File** option from the Office Add-ins Development Kit.
-- The `./src/taskpane/taskpane.html` file contains the HTML markup for the task pane.
-- The `./src/taskpane/taskpane.css` file contains the CSS that's applied to content in the task pane.
-- The `./src/taskpane/taskpane.js` file contains the Office JavaScript API code that facilitates interaction between the task pane and the Excel application.
-
-## Troubleshooting
-
-If you have problems running the add-in, take these steps.
-
-- Close any open instances of Excel.
-- Close the previous web server started for the add-in with the **Stop Previewing Your Office Add-in** Office Add-ins Development Kit extension option.
-
-If you still have problems, see [troubleshoot development errors](https://learn.microsoft.com//office/dev/add-ins/testing/troubleshoot-development-errors) or [create a GitHub issue](https://aka.ms/officedevkitnewissue) and we'll help you.  
-
-For information on running the add-in on Excel on the web, see [Sideload Office Add-ins to Office on the web](https://learn.microsoft.com/office/dev/add-ins/testing/sideload-office-add-ins-for-testing).
-
-For information on debugging on older versions of Office, see [Debug add-ins using developer tools in Microsoft Edge Legacy](https://learn.microsoft.com/office/dev/add-ins/testing/debug-add-ins-using-devtools-edge-legacy).
-
-## Make code changes
-
-All the information about Office Add-ins is found in our [official documentation](https://learn.microsoft.com/office/dev/add-ins/overview/office-add-ins). You can also explore more samples in the Office Add-ins Development Kit. Select **View Samples** to see more samples of real-world scenarios.
-
-If you edit the manifest as part of your changes, use the **Validate Manifest File** option in the Office Add-ins Development Kit. This shows you errors in the manifest syntax.
-
-## Engage with the team
-
-Did you experience any problems? [Create an issue](https://aka.ms/officedevkitnewissue) and we'll help you out.
-
-Want to learn more about new features and best practices for the Office platform? [Join the Microsoft Office Add-ins community call](https://learn.microsoft.com/office/dev/add-ins/overview/office-add-ins-community-call).
-
-## Copyright
-
-Copyright (c) 2024 Microsoft Corporation. All rights reserved.
-
-## Disclaimer
-
-**THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.**
+---
+*For support or inquiries, please open an issue in this repository.*
