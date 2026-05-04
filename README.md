@@ -1,9 +1,10 @@
-# DOT.REG Web Add-in
+# DOT.REG Class Record Web Add-in
 
 [![Microsoft Store](https://img.shields.io/badge/Available_in-Microsoft_Store-blue.svg)](#) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](#)
 
 ## Overview
-The **DOT.REG Web Add-in** provides a secure, seamless interface between the host application (Microsoft Office) and the user's dedicated DOT.REG system. It is designed exclusively for consumers equipped with an existing DOT.REG backend configuration.
+
+The **DOT.REG Class Record Web Add-in** provides a secure, seamless interface between the host application (Microsoft Office) and the user's dedicated DOT.REG system. It is designed exclusively for consumers equipped with an existing DOT.REG backend configuration.
 
 To eliminate sideloading requirements and ensure a streamlined, secure installation process for end-users, this add-in is published directly via the Microsoft Store.
 
