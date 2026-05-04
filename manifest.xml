@@ -75,8 +75,8 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started with DOT.REG Class Record Manager Addin!"/>
-        <bt:String id="CommandsGroup.Label" DefaultValue="DOT/REG Portal"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="DOT.REG Class Record"/>
+        <bt:String id="CommandsGroup.Label" DefaultValue="DOT.REG Portal"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Class Record"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="DOT.REG Class Record Manager add-in loaded successfully. Go to the HOME tab and click the 'DOT.REG Portal' button to get started."/>

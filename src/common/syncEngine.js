@@ -66,7 +66,7 @@ async function performFullSync(setProgress, status, baseUrl) {
     await downloadCRperBatch(templateUrl, sheetsToCopy, myBatches);
     await sleep(300);
     setProgress(97);
-    await downloadTemplate(templateUrl, "Advisory,InstructorSchedule,Base60", 1);
+    await downloadTemplate(templateUrl, "Advisory,InstructorSchedule", 1);
     await sleep(300);
     setProgress(98);
     status.innerText = "Reconstructing formulas...";
@@ -762,12 +762,12 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
                 currentRow = startRow + i;
                 return [
-                `=if(B${currentRow}<>"",LOOKUP(N${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
-                `=if(B${currentRow}<>"",LOOKUP(O${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
-                `=if(B${currentRow}<>"",LOOKUP(P${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
-                `=if(B${currentRow}<>"",LOOKUP(Q${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
-                `=if(B${currentRow}<>"",LOOKUP(R${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`,
-                `=if(B${currentRow}<>"",LOOKUP(S${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44),"")`
+                `=IF(B${currentRow}<>"", SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&N${currentRow}, TransmutationTab[rawscore_max], ">="&N${currentRow}), "")`,
+                `=IF(B${currentRow}<>"", SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&O${currentRow}, TransmutationTab[rawscore_max], ">="&O${currentRow}), "")`,
+                `=IF(B${currentRow}<>"", SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&P${currentRow}, TransmutationTab[rawscore_max], ">="&P${currentRow}), "")`,
+                `=IF(B${currentRow}<>"", SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&Q${currentRow}, TransmutationTab[rawscore_max], ">="&Q${currentRow}), "")`,
+                `=IF(B${currentRow}<>"", SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&R${currentRow}, TransmutationTab[rawscore_max], ">="&R${currentRow}), "")`,
+                `=IF(B${currentRow}<>"", SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&S${currentRow}, TransmutationTab[rawscore_max], ">="&S${currentRow}), "")`
                 ];
             });
             sheet.getRange(`C${startRow}:H${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
@@ -858,9 +858,9 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
                 currentRow = startRow + i;
                 return [
                     `=IF(E${currentRow}="Failed",1,(K${currentRow}*$N$8+Z${currentRow}*$N$9+AI${currentRow}*$N$10+AL${currentRow}*$N$11))`,
-                    `=LOOKUP(F${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`,
+                    `=SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&F${currentRow}, TransmutationTab[rawscore_max], ">="&F${currentRow})`,
                     `=IF(E${currentRow}="Failed",1,AX${currentRow}*$AR$8+BH${currentRow}*$AR$9+BQ${currentRow}*$AR$10)`,
-                    `=LOOKUP(H${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`
+                    `=SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&H${currentRow}, TransmutationTab[rawscore_max], ">="&H${currentRow})`
                 ];
             });
             sheet.getRange(`F${startRow}:I${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
@@ -934,9 +934,9 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
                 currentRow = startRow + i;
                 return [
                     `=IF(E${currentRow}="Failed",1,(K${currentRow}*$N$8+Z${currentRow}*$N$9+AI${currentRow}*$N$10+AL${currentRow}*$N$11))`,
-                    `=LOOKUP(F${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`,
+                    `=SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&F${currentRow}, TransmutationTab[rawscore_max], ">="&F${currentRow})`,
                     `=IF(E${currentRow}="Failed",1,AX${currentRow}*$AR$8+BH${currentRow}*$AR$9+BQ${currentRow}*$AR$10)`,
-                    `=LOOKUP(H${currentRow},Base60!$B$2:$B$44,Base60!$E$2:$E$44)`
+                    `=SUMIFS(TransmutationTab[gradepoint], TransmutationTab[rawscore_min], "<="&H${currentRow}, TransmutationTab[rawscore_max], ">="&H${currentRow})`
                 ];
             });
             sheet.getRange(`F${startRow}:I${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
