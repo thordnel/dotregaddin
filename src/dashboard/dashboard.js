@@ -8,7 +8,7 @@ Office.onReady((info) => {
             const worksheets = context.workbook.worksheets;
             worksheets.onActivated.add(onSheetActivated);
             await context.sync();
-            console.log("Event listener registered successfully."); // This only logs ONCE at startup
+            //console.log("Event listener registered successfully."); // This only logs ONCE at startup
         });
 
         initializeDashboard();
@@ -156,7 +156,7 @@ Office.onReady((info) => {
         }
 
         if (disconnectBtn) disconnectBtn.onclick = handleDisconnect;
-        if (syncBtn) syncBtn.onclick = refreshCalendar;
+        if (syncBtn) syncBtn.onclick = syncAttendance;
     
 
         const manualRawToggle = document.getElementById("manual-raw-toggle");
@@ -643,7 +643,7 @@ async function refreshCalendar() {
 const headerRow = headerRange.values[0];
 
     // Debugging logs
-    console.log("StartSerial:", startSerial); 
+    //console.log("StartSerial:", startSerial); 
 
     // 2. Use .findIndex with explicit conversion to prevent Type Mismatch
     const startOffset = headerRow.findIndex(cell => {
@@ -664,7 +664,7 @@ const headerRow = headerRange.values[0];
     const startColIdx = startOffset + 7;
     const endColIdx = endOffset + 7;
 
-    console.log(`Success! Start Column Index: ${startColIdx}`);
+    //console.log(`Success! Start Column Index: ${startColIdx}`);
             
             // 5. If you NEED the JS Date for other logic (like month names), convert it AFTER finding it
             //const realStartDate = excelSerialToJSDate(startSerial);
@@ -730,4 +730,412 @@ function showConfirmDialog(title, message) {
             resolve(false);
         };
     });
+}
+
+async function applyScheduleExclusions(sheet) {
+    // 1. Load the Schedule Row (8) and the Action Flag Row (13)
+    const scheduleRange = sheet.getRange("H8:IW8");
+    const flagRange = sheet.getRange("H13:IW13");
+    
+    scheduleRange.load("values");
+    flagRange.load("values");
+    
+    await sheet.context.sync();
+    
+    const scheduleVals = scheduleRange.values[0];
+    const flagVals = flagRange.values[0];
+    let hasChanges = false;
+    
+    // 2. Loop through and check for zeroes
+    for (let i = 0; i < scheduleVals.length; i++) {
+        // We explicitly check for 0 (so we don't accidentally trigger on empty blank cells "")
+        if (scheduleVals[i] === 0 || scheduleVals[i] === "0") {
+            // If it's a 0, but row 13 isn't already -1, update it
+            if (flagVals[i] !== -1) {
+                flagVals[i] = -1;
+                hasChanges = true;
+            }
+        }
+    }
+    
+    // 3. Write back ONLY if we made changes (Saves time and prevents Excel UI flicker)
+    if (hasChanges) {
+        flagRange.values = [flagVals];
+        await sheet.context.sync();
+        console.log("✅ Applied schedule exclusions (-1 applied to unscheduled dates).");
+    }
+}
+
+async function syncAttendance() {
+    const status = document.getElementById("status-message");
+    const excludeOutsideSchedule = document.getElementById("exclude-outside-schedule").checked;
+    const rawAddress = await getSettingValue(2);
+    const token = await getSettingValue(6); // Retrieve stored token
+
+    // Check if token exists; if not, show overlay immediately
+    if (!token) {
+        showAuthOverlay(async () => await syncAttendance());
+        return;
+    }
+
+    await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet();
+        const props = sheet.customProperties;
+        
+        // 1. Validate Sheet via Custom Properties
+        const bProp = props.getItemOrNullObject("batchid");
+        const tProp = props.getItemOrNullObject("sheetType");
+        bProp.load("value");
+        tProp.load("value");
+        await context.sync();
+
+        if (tProp.isNullObject || tProp.value !== "attendance_record") {
+            status.innerText = "⚠️ Action only available on Attendance Sheets.";
+            status.style.color = "orange";
+            return; 
+        }
+
+        if (excludeOutsideSchedule) {
+            status.innerText = "Applying schedule filters...";
+            await applyScheduleExclusions(sheet);
+        }
+
+        status.innerText = "Preparing sync...";
+        const batchId = bProp.value;
+        const instructorId = await getSettingValue(3);
+
+        // 2. Load Metadata from cells
+        const subjectRange = sheet.getRange("F10");
+        const totalTraineesRange = sheet.getRange("B13");
+        subjectRange.load("values");
+        totalTraineesRange.load("values");
+        await context.sync();
+
+        const subjectNo = subjectRange.values[0][0];
+        const totalTrainees = parseInt(totalTraineesRange.values[0][0]);
+        if (isNaN(totalTrainees) || totalTrainees <= 0) return;
+
+        const lastRow = 15 + totalTrainees - 1;
+
+        // 3. Load Main Data
+        const dataRange = sheet.getRange(`A12:HO${lastRow}`);
+        dataRange.load("values");
+        await context.sync();
+
+        const data = dataRange.values; 
+        const ops = [];
+        const dateRow = data[0]; 
+        const flagRow = data[1]; 
+
+        // 4. Process Loop
+        for (let i = 3; i < data.length; i++) {
+            const rowData = data[i];
+            const traineeId = rowData[0];
+            if (!traineeId) continue;
+
+            for (let colIdx = 7; colIdx < 231; colIdx++) {
+                if (flagRow[colIdx] !== 1) continue;
+                const val = rowData[colIdx];
+                if (val !== 1 && val !== -1) continue;
+
+                const dateOADate = dateRow[colIdx];
+                if (!dateOADate) continue;
+
+                const dt = new Date((dateOADate - 25569) * 86400 * 1000);
+                dt.setHours(dt.getHours() + 8);
+
+                ops.push({
+                    traineeid: traineeId,
+                    instructorid: instructorId,
+                    subjectno: subjectNo,
+                    batchid: batchId,
+                    timestamp: dt.toISOString().slice(0, 19).replace('T', ' '),
+                    action: val === 1 ? "add" : "remove"
+                });
+            }
+        }
+
+        // 5. API Upload with Authorization Header
+        //console.log(ops)
+        let shouldRetrieve = false; // Add a flag to track if we should proceed
+
+        if (ops.length > 0) {
+            try {
+                const response = await fetch(`https://${rawAddress}/attendance/batch`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify(ops)
+                });
+
+                if (response.ok) {
+                    status.innerText = `✅ Attendance Synced`;
+                    status.style.color = "green";
+                    
+                    
+                    shouldRetrieve = true; // Sync succeeded, safe to proceed
+                    
+                } else if (response.status === 401 || response.status === 403) {
+                    status.innerText = "Authentication expired...";
+                    showAuthOverlay(async () => await syncAttendance());
+                    // shouldRetrieve remains false because we are handing off to the auth overlay
+                } else {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+            } catch (error) {
+                status.innerText = "❌ Sync failed: " + error.message;
+                status.style.color = "red";
+                // shouldRetrieve remains false, skipping the fetch
+            }
+        } else {
+            status.innerText = "No changes to sync. Checking for updates...";
+            shouldRetrieve = true; // Nothing to push, but safe to pull
+        }
+
+        // Only run if the flag was set to true
+        if (shouldRetrieve) {
+            await syncInstructorAttendance(context, batchId);
+            await retrieveAttendanceScans(context, batchId);
+        }
+    });
+}
+async function clearAttendanceFlags(sheet, lastRow) {
+    const range = sheet.getRange(`H15:HO${lastRow}`);
+    range.load("values");
+    await sheet.context.sync();
+
+    const vals = range.values;
+    const newVals = vals.map(row => row.map(cell => cell === -1 ? "" : cell));
+    
+    range.values = newVals;
+    await sheet.context.sync();
+}
+
+async function syncInstructorAttendance(context, batchId) {
+    const status = document.getElementById("status-message");
+    try {
+        const instructorId = await getSettingValue(3);
+        const rawAddress = await getSettingValue(2);
+        const token = await getSettingValue(6); // Retrieve token for 403 prevention
+        
+        // 1. Find sheets by Metadata instead of hardcoded names
+        // This prevents "Resource does not exist" errors if tabs are renamed
+        const wsAtn = await findSheetByMetadata(context, batchId, "attendance_record");
+        const wsMid = await findSheetByMetadata(context, batchId, "gradesheet_record");
+
+        if (!wsAtn || !wsMid) {
+            console.error("Required sheets for Instructor Sync not found.");
+            return;
+        }
+
+   
+        const subjectRange = wsAtn.getRange("F10");
+        const headerRowsRange = wsAtn.getRange("H12:IW13");
+
+        subjectRange.load("values");
+        headerRowsRange.load("values");
+
+        await context.sync(); // One trip to Excel for all metadata[cite: 1, 2]
+
+        const subjectNo = subjectRange.values[0][0];
+        const attendanceData = headerRowsRange.values; 
+        
+        const changes = [];
+        const dateRow = attendanceData[0];
+        const flagRow = attendanceData[1];
+
+        // 4. Process the columns in memory (High Performance)[cite: 1, 2]
+for (let i = 0; i < dateRow.length; i++) {
+    let tsRaw = dateRow[i];
+    
+    if (tsRaw && !isNaN(tsRaw)) {
+        // Convert Excel OA Date to YYYY-MM-DD
+        let dt = new Date((tsRaw - 25569) * 86400 * 1000);
+        let timestamp = dt.toISOString().split('T')[0];
+
+        let valObj = flagRow[i];
+        
+        // 1. SKIP blanks, nulls, and zeros completely
+        if (valObj === null || valObj === "" || valObj === undefined || valObj === 0) {
+            continue; // This skips to the next column without adding anything to 'changes'
+        }
+
+        // 2. NEW LOGIC: Less than zero = "delete", Greater than zero = "insert"
+        let action = (Number(valObj) < 0) ? "delete" : "insert";
+
+        changes.push({
+            idnumber: batchId,
+            instructorid: instructorId,
+            subjectno: subjectNo,
+            timestamp: timestamp,
+            action: action
+        });
+    }
+}
+//console.log(changes)
+        // 5. Submit Batch with Authorization
+        if (changes.length > 0) {
+            const response = await fetch(`https://${rawAddress}/submit-batchattn`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` // Use token to avoid 403[cite: 2]
+                },
+                body: JSON.stringify(changes)
+            });
+
+            if (response.ok) {
+                console.log("✅ Instructor attendance headers synced.");
+            } else if (response.status === 401 || response.status === 403) {
+                // Handle expired token by showing overlay[cite: 2]
+                showAuthOverlay(async () => await syncInstructorAttendance(context, batchId));
+            } else {
+                console.error("Instructor sync failed: " + response.status);
+            }
+        }
+
+    } catch (error) {
+        console.error("Error in syncInstructorAttendance: ", error);
+    }
+}
+async function retrieveAttendanceScans(context, batchId) {
+    const status = document.getElementById("status-message");
+    
+    try {
+        const rawAddress = await getSettingValue(2);
+        const token = await getSettingValue(6);
+        const instructorId = await getSettingValue(3);
+
+        // 1. Locate the correct Attendance sheet via Custom Properties
+        const wsAtn = await findSheetByMetadata(context, batchId, "attendance_record");
+        if (!wsAtn) {
+            console.error("Attendance sheet not found for batch:", batchId);
+            return;
+        }
+
+        // 2. Load the metadata required for the API call
+        const startDateRange = wsAtn.getRange("E8");
+        const endDateRange = wsAtn.getRange("E9");
+        const subjectRange = wsAtn.getRange("F10");
+        const totalTraineesRange = wsAtn.getRange("B13");
+
+        startDateRange.load("values");
+        endDateRange.load("values");
+        subjectRange.load("values");
+        totalTraineesRange.load("values");
+        
+        await context.sync(); // First sync to get parameters
+
+        const subjectNo = subjectRange.values[0][0];
+        const totalTrainees = parseInt(totalTraineesRange.values[0][0]);
+        const startSerial = startDateRange.values[0][0];
+        const endSerial = endDateRange.values[0][0];
+        //console.log(endSerial);
+        if (isNaN(totalTrainees) || totalTrainees <= 0) return;
+
+        // Helper: Convert Excel Serial Date to YYYY-MM-DD string
+        const formatExcelDate = (serial) => {
+            const dt = new Date((serial - 25569) * 86400 * 1000);
+            return dt.toISOString().split('T')[0];
+        };
+
+        const startDateStr = formatExcelDate(startSerial);
+        const endDateStr = formatExcelDate(endSerial);
+
+        status.innerText = "Retrieving records from scanner...";
+
+        // 3. Call the Node.js API
+        const url = `https://${rawAddress}/attendance/fetch?instructorid=${instructorId}&subjectno=${subjectNo}&startdate=${startDateStr}&enddate=${endDateStr}`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                // Token expired, show login overlay
+                showAuthOverlay(async () => await retrieveAttendanceScans(context, batchId));
+            } else {
+                status.innerText = "❌ Failed to fetch records.";
+                console.error("API Error:", response.status);
+            }
+            return;
+        }
+
+        const records = await response.json();
+        //console.log(records);
+        // 4. Map the Excel Structure in Memory
+        const lastRow = 15 + totalTrainees - 1;
+        const traineeRange = wsAtn.getRange(`A15:A${lastRow}`);
+        const dateRange = wsAtn.getRange("H12:IW12");
+
+        traineeRange.load("values");
+        dateRange.load("values");
+        await context.sync(); // Second sync to get map keys
+
+        const traineeVals = traineeRange.values; 
+        const dateVals = dateRange.values[0];    
+
+        // Create fast lookup dictionaries (Objects in JS)
+        const traineeRowMap = {};
+        traineeVals.forEach((row, idx) => {
+            if (row[0]) traineeRowMap[String(row[0])] = idx; 
+        });
+
+        const dateColMap = {};
+        dateVals.forEach((serial, idx) => {
+            if (serial && !isNaN(serial)) {
+                dateColMap[formatExcelDate(serial)] = idx; 
+            }
+        });
+
+        // 5. Prepare Blank 2D Arrays (Exactly matching the Excel dimensions)
+        const rowCount = totalTrainees;
+        const colCount = dateVals.length; // Let Excel tell us exactly how many columns H to HO is!
+        
+        // Fill arrays with empty strings to wipe out old data automatically
+        const dataArr = Array.from({ length: rowCount }, () => Array(colCount).fill(""));
+        const markRow13Arr = [Array(colCount).fill("")];
+
+        // 6. Populate the 2D Arrays with JSON data
+        records.forEach(rec => {
+            const tid = String(rec.idnumber);
+            const d = String(rec.date);
+            const rid = rec.recordid;
+
+            if (traineeRowMap.hasOwnProperty(tid) && dateColMap.hasOwnProperty(d)) {
+                const r = traineeRowMap[tid];
+                const c = dateColMap[d];
+                
+                // Write record ID into the main grid
+                dataArr[r][c] = rid;
+
+                // Mark Row 13 flag if valid
+                if (!isNaN(rid) && parseInt(rid) > 1) {
+                    markRow13Arr[0][c] = 1;
+                }
+            }
+        });
+
+        // 7. Write everything back to Excel in one massive chunk
+        wsAtn.getRange(`H13:IW13`).values = markRow13Arr;
+        wsAtn.getRange(`H15:IW${lastRow}`).values = dataArr;
+
+        const startCleanupRow = lastRow + 1;
+
+        if (startCleanupRow <= 48) {
+            const cleanupRange = wsAtn.getRange(`A${startCleanupRow}:IW48`);
+            cleanupRange.clear(Excel.ClearApplyTo.contents); 
+        }
+        await context.sync(); // Final Sync executes the writes
+
+        status.innerText = "✅ External scans retrieved and synced.";
+        status.style.color = "green";
+
+    } catch (error) {
+        console.error("Error retrieving scans:", error);
+        status.innerText = "❌ Error processing scans.";
+        status.style.color = "red";
+    }
 }

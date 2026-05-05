@@ -33,9 +33,16 @@
             <i class="ms-Icon ms-Icon--Refresh"></i>
         </button>
     </div>
-    <button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%; margin-bottom: 4px;">
+<button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%; margin-bottom: 4px;">
         <span class="ms-Button-label">Sync Attendance</span>
     </button>
+
+    <!-- New Checkbox -->
+    <div style="margin-bottom: 12px; margin-top: 4px; display: flex; align-items: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13px; color: #323130;">
+        <input type="checkbox" id="exclude-outside-schedule" style="margin-right: 8px; cursor: pointer;">
+        <label for="exclude-outside-schedule" style="cursor: pointer;">Exclude attendance logs outside your schedule</label>
+    </div>
+
     <button id="sync-classupdates" class="ms-Button ms-Button--primary" style="width: 100%;">
         <span class="ms-Button-label">Download Class Updates</span>
     </button>
@@ -49,8 +56,8 @@
     </div>
 
     <div class="section group-box" style="border: 1px solid #edebe9; padding: 15px; margin-top: 20px; border-radius: 2px;">
-        <label class="ms-Label" style="font-weight: 600; margin-bottom: 10px; display: block;">Gradesheet Input Options</label>
-        
+        <label class="ms-Label" style="font-weight: 600; margin-bottom: 10px; display: block;"><strong>GRADESHEET INPUT OPTIONS:</strong></label>
+
         <div class="option-item" style="margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span class="ms-fontSize-m">Manual Raw Grades Input</span>

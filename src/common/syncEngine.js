@@ -69,7 +69,7 @@ async function performFullSync(setProgress, status, baseUrl) {
     await downloadTemplate(templateUrl, "Advisory,InstructorSchedule", 1);
     await sleep(300);
     setProgress(98);
-    status.innerText = "Reconstructing formulas...";
+    status.innerText = "Rebuilding formulas...";
     await reapplyAllFormulas();
     status.innerText = "Recalculating workbook...";
         
@@ -693,6 +693,37 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             sheet.getRange("K2").formulas = [[`=SUBSTITUTE(ADDRESS(1,COLUMN(INDIRECT(I2)),4),1,"")`]]          
             sheet.getRange("E13").formulas = [[`=SUMPRODUCT((INDIRECT(H1):INDIRECT(I1)=1)*(INDIRECT(H1):INDIRECT(I1)<>""))`]]
             sheet.getRange("F13").formulas = [[`=SUMPRODUCT((INDIRECT(H2):INDIRECT(I2)=1)*(INDIRECT(H2):INDIRECT(I2)<>""""))`]]  
+            sheet.getRange("H51").formulas = [[`=UNIQUE(LEFT(FILTER(ScheduleTab[schedulecode], (ScheduleTab[instructorid]=Settings!B3) * (ScheduleTab[subjectno]=F10)), 3))`]]
+            //sheet.getRange("H51:H61").setFontColor("white");
+
+            const startColIndex = 7; // Column H is index 7 (0-indexed)
+            const endColIndex = 256; // Column IW is index 256
+            const numColumns = endColIndex - startColIndex + 1;
+            const targetRow = 8;
+
+            // Helper to convert index to Column Letter (e.g., 7 -> "H")
+            const getColumnLetter = (index) => {
+                let letter = "";
+                while (index >= 0) {
+                    letter = String.fromCharCode((index % 26) + 65) + letter;
+                    index = Math.floor(index / 26) - 1;
+                }
+                return letter;
+            };
+
+            // Generate horizontal payload: [[formula1, formula2, ...]]
+            formulaPayload = [
+                Array.from({ length: numColumns }, (_, i) => {
+                    const colLetter = getColumnLetter(startColIndex + i);
+                    return `=--ISNUMBER(MATCH(UPPER(TEXT(${colLetter}$12,"DDD")),$H$51:$H$59,0))`;
+                })
+            ];
+
+            // Target Range: H12 to IW12
+            const targetRange = sheet.getRangeByIndexes(targetRow - 1, startColIndex, 1, numColumns);
+            targetRange.formulas = formulaPayload;
+
+            await context.sync();
 
             startRow = 15;
             formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
@@ -736,7 +767,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             allNames.add(`AF_${batchId}_${subjectId}_18`, sheet.getRange("F13"));
             await context.sync();
 
-            console.log("Reconstructed formulas in attendance tab");
+            console.log("Restored formulas in attendance tab");
             break;
         case "Gradesheet":
             sheet.getRange("K15").values = [[batchId]]; 
@@ -826,7 +857,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             });
             sheet.getRange(`A${startRow}:A${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
             
-            console.log("Reconstructed formulas in gradesheet tab");
+            console.log("Restored formulas in gradesheet tab");
             break;
         
         case "Midterm":
@@ -911,7 +942,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             sheet.getRange("J18").formulas = [[`=iferror(AM_${batchId}_${subjectId}_18,0)`]]
 
 
-            console.log("Reconstructed formulas in midterm tab");
+            console.log("Restored formulas in midterm tab");
             break;
                 
         case "FinalTerm":
@@ -979,7 +1010,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
                 cellFL = sheet.getRange(`H${currentRow}`);
                 allNames.add(uniqueNameFT, cellFT);
                 allNames.add(uniqueNameFL, cellFL);
-                console.log(uniqueNameFT);
+                //console.log(uniqueNameFT);
                 }
             await context.sync();
 
@@ -990,7 +1021,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             sheet.getRange(`J${startRow}:J${startRow + studentRowsCount - 1}`).formulas = formulaPayload;
             sheet.getRange("J18").formulas = [[`=iferror(AF_${batchId}_${subjectId}_18,0)`]]
 
-            console.log("Reconstructed formulas in final term tab");
+            console.log("Restored formulas in final term tab");
             break;
         case "TraineeList":
             sheet.getRange("F8").values = [[batchId]]; 
@@ -1007,7 +1038,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             sheet.getRange("C12").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=F8) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];   
             sheet.getRange("F10").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
             sheet.getRange("F11").formulas = [[`=XLOOKUP(XLOOKUP(F8, BatchlistTab[batchid], BatchlistTab[adviser]), InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
-            console.log("Reconstructed formulas in traineeslist tab");
+            console.log("Restored formulas in traineeslist tab");
             
             break;
     }            
@@ -1068,7 +1099,7 @@ async function reapplyAllFormulas() {
 }
 
 async function ensureServerAwake(status, baseUrl) {
-    console.log(baseUrl);
+    //console.log(baseUrl);
     status.innerText = "Connecting to server... this may take a while";
     status.style.color = "#ffa500"; // Orange for "Working on it"
 

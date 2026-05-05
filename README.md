@@ -14,7 +14,7 @@ Access to the add-in requires authentication through a password-protected gatewa
 
 ### Demo Environment Configuration
 
-Microsoft Reviewers and prospective users can evaluate the add-in using our dedicated demo environment.
+Users can evaluate the add-in using our dedicated demo environment.
 
 > **Note:** The demo server enters a sleep state during periods of inactivity. It may require a brief initialization time (up to a minute) upon the first login attempt.
 
