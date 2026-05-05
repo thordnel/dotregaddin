@@ -671,7 +671,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             sheet.getRange("B6").values = [[batchId]]; 
             sheet.getRange("F10").values = [[`=XLOOKUP(1,(TranscriptTab[BatchID]=B6)*(TranscriptTab[instructorid]=Settings!B3),TranscriptTab[subjectno])`]]; 
             sheet.getRange("A5").formulas = [[`=XLOOKUP(B6, BatchlistTab[batchid], BatchlistTab[batchname])`]];
-            sheet.getRange("A15").formulas = [[`=FILTER(HSTACK(EnrollmentTab[idnumber], LEFT(EnrollmentTab[gender], 1), EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(AND(EnrollmentTab[middlename]<>".", EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=B6)`]];
+            sheet.getRange("A15").formulas = [[`=FILTER(HSTACK(EnrollmentTab[idnumber], LEFT(EnrollmentTab[gender], 1), EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & IF(TRIM(EnrollmentTab[middlename])<>"", " " & LEFT(TRIM(EnrollmentTab[middlename]), 1) & ".", "")), EnrollmentTab[batchid]=B6, "")`]];
             sheet.getRange("B7").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
             sheet.getRange("B8").formulas = [[`=XLOOKUP(XLOOKUP(B6, BatchlistTab[batchid], BatchlistTab[adviser]), InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
             sheet.getRange("B9").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=B6) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];
@@ -773,7 +773,7 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             sheet.getRange("K15").values = [[batchId]]; 
             sheet.getRange("M12").values = [[`=XLOOKUP(1,(TranscriptTab[BatchID]=K15)*(TranscriptTab[instructorid]=Settings!B3),TranscriptTab[subjectno])`]]; 
             sheet.getRange("K14").values = [[`=COUNTIF(B20:B51, "?*")`]]; 
-            sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(AND(EnrollmentTab[middlename]<>".", EnrollmentTab[middlename]<>""), LEFT(EnrollmentTab[middlename], 1) & ". ", "")), EnrollmentTab[batchid]=K15)`]];
+            sheet.getRange("B21").formulas = [[`=FILTER(HSTACK(EnrollmentTab[lastname] & ", " & EnrollmentTab[firstname] & " " & IF(TRIM(EnrollmentTab[middlename])<>"", " " & LEFT(TRIM(EnrollmentTab[middlename]), 1) & ".", "")), EnrollmentTab[batchid]=K15)`]];
             sheet.getRange("M21").formulas = [[`=FILTER(EnrollmentTab[recordid], EnrollmentTab[batchid]=K15)`]];
             sheet.getRange("A8").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=K15) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode])`]];
             sheet.getRange("A11").formulas = [[`=UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=K15) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];
