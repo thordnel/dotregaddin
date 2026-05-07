@@ -64,12 +64,16 @@ async function performFullSync(setProgress, status, baseUrl) {
     const sheetsToCopy = "TraineeList,FinalTerm,Midterm,Gradesheet,Attendance";
 
     await downloadCRperBatch(templateUrl, sheetsToCopy, myBatches);
-    await sleep(300);
+    await sleep(100);
     setProgress(97);
     await downloadTemplate(templateUrl, "Advisory,InstructorSchedule", 1);
-    await sleep(300);
+    await sleep(100);
     setProgress(98);
-    status.innerText = "Rebuilding formulas...";
+    status.innerText = "Rebuilding formulas. Please wait...";
+
+    const userid = await getSettingValue(3);
+    await createSchedule(userid);
+
     await reapplyAllFormulas();
     status.innerText = "Recalculating workbook...";
         
@@ -409,7 +413,18 @@ async function refreshInstructorData() {
 }
 
 async function refreshScheduleData() {
-    await syncTableFromApi('/fl_get_schedule', 'scheduletab', 'ScheduleTab');
+    const instructorId = await getSettingValue(3); 
+    
+    if (!instructorId) {
+        console.error("No Instructor ID found. Please log in again.");
+        return;
+    }
+    await syncTableFromApi(
+        '/fl_get_schedule',
+        'scheduletab',
+        'ScheduleTab',
+        { instructorid: instructorId }
+    );
 }
 
 async function refreshAttendanceData() {
@@ -555,16 +570,27 @@ async function downloadTemplate(fileUrl, sheetNamesCommaSeparated, mode) {
             const buffer = await response.arrayBuffer();
             const base64 = arrayBufferToBase64(buffer);
 
-            // 3. Insert the templates into the workbook
-            
             context.workbook.insertWorksheetsFromBase64(base64, {
                 sheetNamesToInsert: targetSheets,
-                positionType: Excel.WorksheetPositionType.end,
-                //relativeTo: context.workbook.worksheets.getActiveWorksheet()
+                positionType: Excel.WorksheetPositionType.end
             });
 
+
             await context.sync();
-        });
+
+            // 3. Loop through the target sheet names and access them from the workbook
+            targetSheets.forEach((sheetName) => {
+                const sheet = context.workbook.worksheets.getItem(sheetName);
+                
+                if (sheetName === "InstructorSchedule") {
+                    sheet.customProperties.add("sheetType", "schedule_record");
+                } else if (sheetName === "Advisory") {
+                    sheet.customProperties.add("sheetType", "advisory_record");
+                }
+            });
+
+            await context.sync();  
+            });
     } catch (error) {
         // Log details for debugging in the console
         console.error("Template Error:", error);
@@ -1041,6 +1067,13 @@ async function injectSheetFormulas(context,sheet, baseName, batchId) {
             console.log("Restored formulas in traineeslist tab");
             
             break;
+        
+        case "InstructorSchedule":
+            sheet.getRange("A10").values = [[batchId]]; 
+            sheet.getRange("B6").formulas = [[`=XLOOKUP(A10, batchlisttab[batchid], batchlisttab[year])`]];
+            sheet.getRange("B7").formulas = [[`=XLOOKUP(A10, batchlisttab[batchid], batchlisttab[period])`]];
+            break;
+
     }            
 }
     
@@ -1126,4 +1159,459 @@ async function ensureServerAwake(status, baseUrl) {
     if (!isAwake) {
         throw new Error("The server is taking too long to wake up. Please try again in a moment.");
     }
+}
+
+
+async function setSchedule(context, sheet, cellsRange, subjectcode, shortname, room, subjecttitle, backcolor) {
+    // Safety Check: Ensure cellsRange is a valid array with exactly 4 addresses
+    if (!cellsRange || !Array.isArray(cellsRange) || cellsRange.length !== 4) {
+        console.warn(`[setSchedule] Invalid range for ${subjectcode}. Expected 4 cells, got:`, cellsRange);
+        return;
+    }
+
+    try {
+        // 1. Set values individually
+        const cell0 = sheet.getRange(cellsRange[0]);
+        cell0.values = [[(subjectcode || "").toUpperCase()]];
+        cell0.format.font.set({ name: "Calibri", size: 18, bold: true });
+        
+        const cell1 = sheet.getRange(cellsRange[1]);
+        const truncatedTitle = (subjecttitle || "").length > 25 
+            ? (subjecttitle.slice(0, 25) + "…") 
+            : (subjecttitle || "");
+
+        cell1.values = [[truncatedTitle.toUpperCase()]];
+        cell1.format.font.set({ name: "Calibri", size: 15, bold: false });
+
+        const cell2 = sheet.getRange(cellsRange[2]);
+        const cleanName = (shortname || "").replace("Batch ", "").trim();
+        cell2.values = [[cleanName]];
+        cell2.format.font.set({ name: "Calibri", size: 16, bold: true });
+
+        const cell3 = sheet.getRange(cellsRange[3]);
+        cell3.values = [[room || ""]];
+        cell3.format.font.set({ name: "Calibri", size: 15, italic: false });
+
+        // 2. Apply formatting to the block
+        const fullRange = sheet.getRange(`${cellsRange[0]}:${cellsRange[3]}`);
+        
+        if (backcolor) {
+            let color = backcolor.toString();
+            if (!color.startsWith("#")) color = "#" + color;
+            if (color.length === 7) fullRange.format.fill.color = color;
+        }
+
+        fullRange.format.horizontalAlignment = "Center";
+        fullRange.format.verticalAlignment = "Center";
+
+    } catch (error) {
+        console.error("Error in setSchedule:", error);
+    }
+}
+
+/**
+ * Handles 30-minute slots (Expects 2 cells)
+ */
+async function setScheduleSplit(context, sheet, cellsRange, subjectcode, shortname, room, subjecttitle, backcolor) {
+    // Safety Check: Ensure cellsRange is a valid array with exactly 2 addresses
+    if (!cellsRange || !Array.isArray(cellsRange) || cellsRange.length !== 2) {
+        console.warn(`[setScheduleSplit] Invalid range for ${subjectcode}. Expected 2 cells, got:`, cellsRange);
+        return;
+    }
+
+    try {
+        // For split slots, we often combine info due to limited space
+        const cell0 = sheet.getRange(cellsRange[0]);
+        cell0.values = [[(subjectcode || "").toUpperCase()]];
+        cell0.format.font.set({ name: "Calibri", size: 18, bold: true });
+        
+        const cell1 = sheet.getRange(cellsRange[1]);
+        // Combine Room and Batch/Shortname to fit in the second cell
+        const cleanName = (shortname || "").replace("Batch ", "").trim();
+        cell1.values = [[`${cleanName} | ${room || ""}`]];
+        cell1.format.font.set({ name: "Calibri", size: 15, bold: false });
+
+        const fullRange = sheet.getRange(`${cellsRange[0]}:${cellsRange[1]}`);
+        
+        if (backcolor) {
+            let color = backcolor.toString();
+            if (!color.startsWith("#")) color = "#" + color;
+            if (color.length === 7) fullRange.format.fill.color = color;
+        }
+
+        fullRange.format.horizontalAlignment = "Center";
+        fullRange.format.verticalAlignment = "Center";
+
+    } catch (error) {
+        console.error("Error in setScheduleSplit:", error);
+    }
+}
+
+/**
+ * Updated calling function
+ */
+async function createSchedule(instructorid) {
+    const rawAddress = await getSettingValue(2);
+    const token = await getSettingValue(6);
+    const status = document.getElementById("status-message");
+
+    if (!token) {
+        showAuthOverlay(async () => await createSchedule(instructorid));
+        return;
+    }
+
+    try {
+        await Excel.run(async (context) => {
+            const worksheets = context.workbook.worksheets;
+            worksheets.load("items/name, items/customProperties");
+            await context.sync();
+
+            let targetSheet = null;
+            for (let sheet of worksheets.items) {
+                const typeProp = sheet.customProperties.getItemOrNullObject("sheetType");
+                typeProp.load("value");
+                await context.sync();
+
+                if (!typeProp.isNullObject && typeProp.value === "schedule_record") {
+                    targetSheet = sheet;
+                    targetSheet.activate();
+                    await context.sync();
+                    break;
+                }
+            }
+
+            if (!targetSheet) {
+
+                console.error("Schedule sheet not found.");
+                return;
+            }
+    status.innerText = "Retrieving latest schedule...";
+    status.style.color = "#0078d4";
+                        // --- INITIALIZE SHEET (CLEANING) ---
+            // Define the morning and afternoon ranges
+            const morningRange = targetSheet.getRange("B11:G30");
+            const afternoonRange = targetSheet.getRange("B32:G51");
+
+            // Clear values and formatting
+            morningRange.clear(Excel.ClearApplyTo.contents);
+            morningRange.format.fill.color = "#FFFFFF"; // Set to White
+
+            afternoonRange.clear(Excel.ClearApplyTo.contents);
+            afternoonRange.format.fill.color = "#FFFFFF"; // Set to White
+
+            // Sync after clearing to ensure UI updates before drawing new data
+            await context.sync();
+            //console.log(instructorid)
+            const response = await fetch(`https://${rawAddress}/schedule/fetch?instructorid=${encodeURIComponent(instructorid)}`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.status === 401 || response.status === 403) {
+                showAuthOverlay(async () => await createSchedule(instructorid));
+                return;
+            }
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            status.innerText = "Importing latest schedule data...";
+            await refreshScheduleData();
+            const scheddata = await response.json();
+            let loadhr = 0;
+
+            for (let row of scheddata) {
+                let {
+                    schedulecode, 
+                    shortname, 
+                    room, 
+                    splitstate, 
+                    backcolor,
+                    subjectcode,
+                    subjecttitle
+                } = row;
+
+                if (splitstate === 1) {
+                    // Use schedule_map_split (2 cells)
+                    const cellsRange = typeof schedule_map_split !== 'undefined' ? schedule_map_split[schedulecode] : null;
+                    if (cellsRange) {
+                        await setScheduleSplit(context, targetSheet, cellsRange, subjectcode, shortname, room, subjecttitle, backcolor);
+                        loadhr += 0.5;
+                    } else {
+                        console.warn(`No split mapping found for: ${schedulecode}`);
+                    }
+                } else {
+                    // Use schedule_map (4 cells)
+                    const cellsRange = typeof schedule_map !== 'undefined' ? schedule_map[schedulecode] : null;
+                    if (cellsRange) {
+                        await setSchedule(context, targetSheet, cellsRange, subjectcode, shortname, room, subjecttitle, backcolor);
+                        loadhr += 1;
+                    } else {
+                        console.warn(`No standard mapping found for: ${schedulecode}`);
+                    }
+                }
+            }
+            const range = targetSheet.getRange("A9");
+            range.select();
+
+            await context.sync();
+            
+            //console.log(`Schedule successfully populated. Total load: ${loadhr} hrs.`);
+            status.innerText = "Instructor's schedule updated.";
+            status.style.color = "green";
+            setTimeout(() => {
+               
+                status.innerText = "Ready";
+                status.style.color = "#605e5c"; // Neutral gray
+            }, 5000);
+        });
+        
+    } catch (error) {
+        console.error("Error creating schedule:", error);
+    }
+}
+
+schedule_map = {
+    "MON0": ["B11", "B12", "B13", "B14"],
+    "MON1": ["B15", "B16", "B17", "B18"],
+    "MON2": ["B19", "B20", "B21", "B22"],
+    "MON3": ["B23", "B24", "B25", "B26"],
+    "MON4": ["B27", "B28", "B29", "B30"],
+    "MON5": ["B32", "B33", "B34", "B35"],
+    "MON6": ["B36", "B37", "B38", "B39"],
+    "MON7": ["B40", "B41", "B42", "B43"],
+    "MON8": ["B44", "B45", "B46", "B47"],
+    "MON9": ["B48", "B49", "B50", "B51"],
+    "MON0": ["B11", "B12", "B13", "B14"],
+    "MON1": ["B15", "B16", "B17", "B18"],
+    "MON2": ["B19", "B20", "B21", "B22"],
+    "MON3": ["B23", "B24", "B25", "B26"],
+    "MON4": ["B27", "B28", "B29", "B30"],
+    "MON5": ["B32", "B33", "B34", "B35"],
+    "MON6": ["B36", "B37", "B38", "B39"],
+    "MON7": ["B40", "B41", "B42", "B43"],
+    "MON8": ["B44", "B45", "B46", "B47"],
+    "MON9": ["B48", "B49", "B50", "B51"],
+    "TUE0": ["C11", "C12", "C13", "C14"],
+    "TUE1": ["C15", "C16", "C17", "C18"],
+    "TUE2": ["C19", "C20", "C21", "C22"],
+    "TUE3": ["C23", "C24", "C25", "C26"],
+    "TUE4": ["C27", "C28", "C29", "C30"],
+    "TUE5": ["C32", "C33", "C34", "C35"],
+    "TUE6": ["C36", "C37", "C38", "C39"],
+    "TUE7": ["C40", "C41", "C42", "C43"],
+    "TUE8": ["C44", "C45", "C46", "C47"],
+    "TUE9": ["C48", "C49", "C50", "C51"],
+    "TUE0": ["C11", "C12", "C13", "C14"],
+    "TUE1": ["C15", "C16", "C17", "C18"],
+    "TUE2": ["C19", "C20", "C21", "C22"],
+    "TUE3": ["C23", "C24", "C25", "C26"],
+    "TUE4": ["C27", "C28", "C29", "C30"],
+    "TUE5": ["C32", "C33", "C34", "C35"],
+    "TUE6": ["C36", "C37", "C38", "C39"],
+    "TUE7": ["C40", "C41", "C42", "C43"],
+    "TUE8": ["C44", "C45", "C46", "C47"],
+    "TUE9": ["C48", "C49", "C50", "C51"],
+    "WED0": ["D11", "D12", "D13", "D14"],
+    "WED1": ["D15", "D16", "D17", "D18"],
+    "WED2": ["D19", "D20", "D21", "D22"],
+    "WED3": ["D23", "D24", "D25", "D26"],
+    "WED4": ["D27", "D28", "D29", "D30"],
+    "WED5": ["D32", "D33", "D34", "D35"],
+    "WED6": ["D36", "D37", "D38", "D39"],
+    "WED7": ["D40", "D41", "D42", "D43"],
+    "WED8": ["D44", "D45", "D46", "D47"],
+    "WED9": ["D48", "D49", "D50", "D51"],
+    "WED0": ["D11", "D12", "D13", "D14"],
+    "WED1": ["D15", "D16", "D17", "D18"],
+    "WED2": ["D19", "D20", "D21", "D22"],
+    "WED3": ["D23", "D24", "D25", "D26"],
+    "WED4": ["D27", "D28", "D29", "D30"],
+    "WED5": ["D32", "D33", "D34", "D35"],
+    "WED6": ["D36", "D37", "D38", "D39"],
+    "WED7": ["D40", "D41", "D42", "D43"],
+    "WED8": ["D44", "D45", "D46", "D47"],
+    "WED9": ["D48", "D49", "D50", "D51"],
+    "THU0": ["E11", "E12", "E13", "E14"],
+    "THU1": ["E15", "E16", "E17", "E18"],
+    "THU2": ["E19", "E20", "E21", "E22"],
+    "THU3": ["E23", "E24", "E25", "E26"],
+    "THU4": ["E27", "E28", "E29", "E30"],
+    "THU5": ["E32", "E33", "E34", "E35"],
+    "THU6": ["E36", "E37", "E38", "E39"],
+    "THU7": ["E40", "E41", "E42", "E43"],
+    "THU8": ["E44", "E45", "E46", "E47"],
+    "THU9": ["E48", "E49", "E50", "E51"],
+    "THU0": ["E11", "E12", "E13", "E14"],
+    "THU1": ["E15", "E16", "E17", "E18"],
+    "THU2": ["E19", "E20", "E21", "E22"],
+    "THU3": ["E23", "E24", "E25", "E26"],
+    "THU4": ["E27", "E28", "E29", "E30"],
+    "THU5": ["E32", "E33", "E34", "E35"],
+    "THU6": ["E36", "E37", "E38", "E39"],
+    "THU7": ["E40", "E41", "E42", "E43"],
+    "THU8": ["E44", "E45", "E46", "E47"],
+    "THU9": ["E48", "E49", "E50", "E51"],
+	"FRI0": ["F11", "F12", "F13", "F14"],
+    "FRI1": ["F15", "F16", "F17", "F18"],
+    "FRI2": ["F19", "F20", "F21", "F22"],
+    "FRI3": ["F23", "F24", "F25", "F26"],
+    "FRI4": ["F27", "F28", "F29", "F30"],
+    "FRI5": ["F32", "F33", "F34", "F35"],
+    "FRI6": ["F36", "F37", "F38", "F39"],
+    "FRI7": ["F40", "F41", "F42", "F43"],
+    "FRI8": ["F44", "F45", "F46", "F47"],
+    "FRI9": ["F48", "F49", "F50", "F51"],
+    "FRI0": ["F11", "F12", "F13", "F14"],
+    "FRI1": ["F15", "F16", "F17", "F18"],
+    "FRI2": ["F19", "F20", "F21", "F22"],
+    "FRI3": ["F23", "F24", "F25", "F26"],
+    "FRI4": ["F27", "F28", "F29", "F30"],
+    "FRI5": ["F32", "F33", "F34", "F35"],
+    "FRI6": ["F36", "F37", "F38", "F39"],
+    "FRI7": ["F40", "F41", "F42", "F43"],
+    "FRI8": ["F44", "F45", "F46", "F47"],
+    "FRI9": ["F48", "F49", "F50", "F51"],
+    "SAT0": ["G11", "G12", "G13", "G14"],
+    "SAT1": ["G15", "G16", "G17", "G18"],
+    "SAT2": ["G19", "G20", "G21", "G22"],
+    "SAT3": ["G23", "G24", "G25", "G26"],
+    "SAT4": ["G27", "G28", "G29", "G30"],
+    "SAT5": ["G32", "G33", "G34", "G35"],
+    "SAT6": ["G36", "G37", "G38", "G39"],
+    "SAT7": ["G40", "G41", "G42", "G43"],
+    "SAT8": ["G44", "G45", "G46", "G47"],
+    "SAT9": ["G48", "G49", "G50", "G51"],
+    "SAT0": ["G11", "G12", "G13", "G14"],
+    "SAT1": ["G15", "G16", "G17", "G18"],
+    "SAT2": ["G19", "G20", "G21", "G22"],
+    "SAT3": ["G23", "G24", "G25", "G26"],
+    "SAT4": ["G27", "G28", "G29", "G30"],
+    "SAT5": ["G32", "G33", "G34", "G35"],
+    "SAT6": ["G36", "G37", "G38", "G39"],
+    "SAT7": ["G40", "G41", "G42", "G43"],
+    "SAT8": ["G44", "G45", "G46", "G47"],
+    "SAT9": ["G48", "G49", "G50", "G51"],    
+}
+
+schedule_map_split = {
+    "MON0": ["B11", "B12"],
+    "MON0B": ["B13", "B14"],
+    "MON1": ["B15", "B16"],
+    "MON1B": ["B17", "B18"],    
+    "MON2": ["B19", "B20"],
+    "MON2B": ["B21", "B22"],
+    "MON3": ["B23", "B24"],
+    "MON3B": ["B25", "B26"],    
+    "MON4": ["B27", "B28"],
+    "MON4B": ["B29", "B30"],    
+    "MON5": ["B32", "B33"],
+    "MON5B": ["B34", "B35"],
+    "MON6": ["B36", "B37"],
+    "MON6B": ["B38", "B39"],
+    "MON7": ["B40", "B41"],
+    "MON7B": ["B42", "B43"],  
+    "MON8": ["B44", "B45"],
+    "MON8B": ["B46", "B47"],
+    "MON9": ["B48", "B49"],
+    "MON9B": ["B50", "B51"],
+    "TUE0": ["C11", "C12"],
+    "TUE0B": ["C13", "C14"],
+    "TUE1": ["C15", "C16"],
+    "TUE1B": ["C17", "C18"],    
+    "TUE2": ["C19", "C20"],
+    "TUE2B": ["C21", "C22"],
+    "TUE3": ["C23", "C24"],
+    "TUE3B": ["C25", "C26"],    
+    "TUE4": ["C27", "C28"],
+    "TUE4B": ["C29", "C30"],    
+    "TUE5": ["C32", "C33"],
+    "TUE5B": ["C34", "C35"],
+    "TUE6": ["C36", "C37"],
+    "TUE6B": ["C38", "C39"],
+    "TUE7": ["C40", "C41"],
+    "TUE7B": ["C42", "C43"],  
+    "TUE8": ["C44", "C45"],
+    "TUE8B": ["C46", "C47"],
+    "TUE9": ["C48", "C49"],
+    "TUE9B": ["C50", "C51"],  
+    "WED0": ["D11", "D12"],
+    "WED0B": ["D13", "D14"],
+    "WED1": ["D15", "D16"],
+    "WED1B": ["D17", "D18"],    
+    "WED2": ["D19", "D20"],
+    "WED2B": ["D21", "D22"],
+    "WED3": ["D23", "D24"],
+    "WED3B": ["D25", "D26"],    
+    "WED4": ["D27", "D28"],
+    "WED4B": ["D29", "D30"],    
+    "WED5": ["D32", "D33"],
+    "WED5B": ["D34", "D35"],
+    "WED6": ["D36", "D37"],
+    "WED6B": ["D38", "D39"],
+    "WED7": ["D40", "D41"],
+    "WED7B": ["D42", "D43"],  
+    "WED8": ["D44", "D45"],
+    "WED8B": ["D46", "D47"],
+    "WED9": ["D48", "D49"],
+    "WED9B": ["D50", "D51"], 
+    "THU0": ["E11", "E12"],
+    "THU0B": ["E13", "E14"],
+    "THU1": ["E15", "E16"],
+    "THU1B": ["E17", "E18"],    
+    "THU2": ["E19", "E20"],
+    "THU2B": ["E21", "E22"],
+    "THU3": ["E23", "E24"],
+    "THU3B": ["E25", "E26"],    
+    "THU4": ["E27", "E28"],
+    "THU4B": ["E29", "E30"],    
+    "THU5": ["E32", "E33"],
+    "THU5B": ["E34", "E35"],
+    "THU6": ["E36", "E37"],
+    "THU6B": ["E38", "E39"],
+    "THU7": ["E40", "E41"],
+    "THU7B": ["E42", "E43"],  
+    "THU8": ["E44", "E45"],
+    "THU8B": ["E46", "E47"],
+    "THU9": ["E48", "E49"],
+    "THU9B": ["E50", "E51"],  
+    "FRI0": ["F11", "F12"],
+    "FRI0B": ["F13", "F14"],
+    "FRI1": ["F15", "F16"],
+    "FRI1B": ["F17", "F18"],    
+    "FRI2": ["F19", "F20"],
+    "FRI2B": ["F21", "F22"],
+    "FRI3": ["F23", "F24"],
+    "FRI3B": ["F25", "F26"],    
+    "FRI4": ["F27", "F28"],
+    "FRI4B": ["F29", "F30"],    
+    "FRI5": ["F32", "F33"],
+    "FRI5B": ["F34", "F35"],
+    "FRI6": ["F36", "F37"],
+    "FRI6B": ["F38", "F39"],
+    "FRI7": ["F40", "F41"],
+    "FRI7B": ["F42", "F43"],  
+    "FRI8": ["F44", "F45"],
+    "FRI8B": ["F46", "F47"],
+    "FRI9": ["F48", "F49"],
+    "FRI9B": ["F50", "F51"],  
+    "SAT0": ["G11", "G12"],
+    "SAT0B": ["G13", "G14"],
+    "SAT1": ["G15", "G16"],
+    "SAT1B": ["G17", "G18"],    
+    "SAT2": ["G19", "G20"],
+    "SAT2B": ["G21", "G22"],
+    "SAT3": ["G23", "G24"],
+    "SAT3B": ["G25", "G26"],    
+    "SAT4": ["G27", "G28"],
+    "SAT4B": ["G29", "G30"],    
+    "SAT5": ["G32", "G33"],
+    "SAT5B": ["G34", "G35"],
+    "SAT6": ["G36", "G37"],
+    "SAT6B": ["G38", "G39"],
+    "SAT7": ["G40", "G41"],
+    "SAT7B": ["G42", "G43"],  
+    "SAT8": ["G44", "G45"],
+    "SAT8B": ["G46", "G47"],
+    "SAT9": ["G48", "G49"],
+    "SAT9B": ["G50", "G51"],  
 }

@@ -79,7 +79,7 @@
         <bt:String id="TaskpaneButton.Label" DefaultValue="Class Record"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="DOT.REG Class Record Manager add-in loaded successfully. Go to the HOME tab and click the 'DOT.REG Portal' button to get started."/>
+        <bt:String id="GetStarted.Description" DefaultValue="DOT.REG Class Record Manager add-in loaded successfully. Go to the HOME tab and click the 'Class Record' button."/>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Click to show DOT.REG Portal"/>
       </bt:LongStrings>
     </Resources>

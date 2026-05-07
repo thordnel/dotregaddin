@@ -23,7 +23,7 @@
     </header>
 
 <div class="section">
-    <label class="ms-Label" for="class-dropdown">Available Class</label>
+    <label class="ms-Label" for="class-dropdown">Switch class record book:</label>
     <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 8px;">
         <select id="class-dropdown" class="input" style="flex-grow: 1;">
             <option value="" disabled selected>Select a class...</option>
@@ -33,66 +33,65 @@
             <i class="ms-Icon ms-Icon--Refresh"></i>
         </button>
     </div>
-<button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%; margin-bottom: 4px;">
+<fieldset style="border: 1px solid #d2d0ce; padding: 10px; border-radius: 2px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <legend style="padding: 0 5px; font-weight: 400; font-size: 12px; color: #323130;">Class Attendance & Schedule</legend>
+        <div id="schedule-container" style="border: 0px dashed #ccc; padding: 2px; min-height: 60px; border-radius: 2px; background-color: #faf9f8;">
+            <span class="ms-fontSize-xs" style="color: #605e5c;">No classes scheduled for today.</span>
+        </div>
+        <br>
+    <button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%; margin-bottom: 4px;">
         <span class="ms-Button-label">Sync Attendance</span>
     </button>
 
     <!-- New Checkbox -->
-    <div style="margin-bottom: 12px; margin-top: 4px; display: flex; align-items: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13px; color: #323130;">
+    <div style="margin-bottom: 12px; margin-top: 4px; display: flex; align-items: center; font-size: 13px; color: #323130;">
         <input type="checkbox" id="exclude-outside-schedule" style="margin-right: 8px; cursor: pointer;">
-        <label for="exclude-outside-schedule" style="cursor: pointer;">Exclude attendance logs outside your schedule</label>
+        <label for="exclude-outside-schedule" style="cursor: pointer; font-weight: 400;">Exclude attendance logs outside your schedule</label>
     </div>
 
-    <button id="sync-classupdates" class="ms-Button ms-Button--primary" style="width: 100%;">
-        <span class="ms-Button-label">Download Class Updates</span>
+
+    <button id="sync-instsched" class="ms-Button ms-Button--primary" style="width: 100%;">
+        <span class="ms-Button-label">Refresh Schedule</span>
     </button>
+</fieldset>
 </div>
 
-    <div class="section" style="margin-top: 20px;">
-        <label class="ms-Label">Today's Schedule:</label>
-        <div id="schedule-container" style="border: 1px dashed #ccc; padding: 12px; min-height: 60px; border-radius: 2px; background-color: #faf9f8;">
-            <span class="ms-fontSize-xs" style="color: #605e5c;">No classes scheduled for today.</span>
+    
+
+<fieldset style="border: 1px solid #d2d0ce; padding: 10px; border-radius: 2px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <legend style="padding: 0 5px; font-weight: 400; font-size: 12px; color: #323130;">Gradesheet Input Options</legend>
+
+    <div class="option-item" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="ms-fontSize-m">Manual Raw Grades Input</span>
+            <input type="checkbox" id="manual-raw-toggle">
         </div>
+        <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
+            Use this to automatically calculate grade point with manually entered raw grades
+        </p>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+            <span class="ms-fontSize-m">Manual Grade Point (G.P.) Input</span>
+            <input type="checkbox" id="manual-auto-toggle">
+        </div>
+        <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
+            Remove gradesheet formulas and manually enter Grade Point for submission.
+        </p>
     </div>
 
-    <div class="section group-box" style="border: 1px solid #edebe9; padding: 15px; margin-top: 20px; border-radius: 2px;">
-        <label class="ms-Label" style="font-weight: 600; margin-bottom: 10px; display: block;"><strong>GRADESHEET INPUT OPTIONS:</strong></label>
+    <div class="future-settings"></div>
 
-        <div class="option-item" style="margin-bottom: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="ms-fontSize-m">Manual Raw Grades Input</span>
-                <input type="checkbox" id="manual-raw-toggle">
-            </div>
-            <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
-                Use this to automatically calculate grade point with manually entered raw grades
-            </p>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="ms-fontSize-m">Manual Grade Point (G.P.) Input</span>
-                <input type="checkbox" id="manual-auto-toggle">
-            </div>
-            <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
-                Remove gradesheet formulas and manually enter Grade Point for submission.
-            </p>
-<!--             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="ms-fontSize-m">Allow only valid Grade Point (G.P.)</span>
-                <input type="checkbox" id="valid-grade-toggle" checked>
-            </div>
-            <p class="ms-fontSize-xs" style="color: #666; margin-top: 4px; line-height: 1.4;">
-                Ensure only the official grade points are accepted. Uncheck to override the values.
-            </p> -->
-        </div>
+    <button id="submit-gradesheet" class="ms-Button ms-Button--hero" style="width: 100%;">
+        <span class="ms-Button-label">Submit Gradesheet</span>
+    </button>
+</fieldset>
 
-        <div class="future-settings"></div>
-
-        <button id="submit-gradesheet" class="ms-Button ms-Button--hero" style="width: 100%;">
-            <span class="ms-Button-label">Submit Gradesheet</span>
-        </button>
-    </div>
-
-
-  
-
-    <hr style="border: 0; border-top: 1px solid #f3f2f1; margin: 25px 0;">
+<hr style="border: 0; border-top: 1px solid #f3f2f1; margin: 10px 0;">
+<fieldset style="border: 1px solid #d2d0ce; padding: 10px; border-radius: 2px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <legend style="padding: 0 5px; font-weight: 400; font-size: 12px; color: #323130;">Maintenance</legend>
+    <button id="sync-classupdates" class="ms-Button ms-Button--primary" style="width: 100%; margin-bottom: 4px;">
+        <span class="ms-Button-label">Download Class Updates</span>
+    </button>
 
     <div class="section footer" style="text-align: center; padding-bottom: 20px;">
         <button id="disconnect-button" class="ms-Button" style="width: 100%; border-color: #a4262c;">
@@ -102,6 +101,11 @@
             Manage your class records offline. This workbook will be exclusively locked to your profile. Log in any time.
         </p>
     </div>
+</fieldset>
+
+    
+
+    
 
 <div id="auth-overlay" class="auth-overlay">
     <div id="auth-panel" class="auth-panel">
@@ -121,6 +125,29 @@
             
             <button id="confirm-submit" class="ms-Button ms-Button--hero">
                 <span class="ms-Button-label">Submit</span>
+            </button>
+        </div>
+    </div>
+</div>
+<div id="trainee-overlay" class="auth-overlay">
+    <div id="trainee-panel" class="auth-panel">
+<div class="panel-header" style="align-items: flex-start;">
+            <div>
+                <div class="ms-fontWeight-semibold" style="font-size: 16px;">Check Trainee's Attendance</div>
+                <div style="font-size: 11px; color: #a4262c; margin-top: 4px; font-weight: 400;">
+                    <i class="ms-Icon ms-Icon--WifiWarning4"></i> Note: This facility requires a server connection.
+                </div>
+            </div>
+            <button id="close-trainee-panel" style="background:none; border:none; cursor:pointer; font-size: 22px; line-height: 1;">&times;</button>
+        </div>
+        
+        <div id="trainee-list-container" class="panel-body" style="max-height: 400px; overflow-y: auto;">
+            <div id="trainee-loading">Loading student list...</div>
+        </div>
+
+        <div class="panel-footer" style="padding: 15px 20px; border-top: 1px solid #edebe9;">
+            <button id="confirm-trainee-selection" class="ms-Button ms-Button--hero" style="width: 100%;">
+                <span class="ms-Button-label">Refresh Attendance</span>
             </button>
         </div>
     </div>

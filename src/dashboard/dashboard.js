@@ -12,10 +12,9 @@ Office.onReady((info) => {
         });
 
         initializeDashboard();
+        initScheduleMonitor();
 
 
-
-        
         // --- BUTTON SELECTIONS ---
         const submitBtn = document.getElementById('submit-gradesheet');
         const refreshBtn = document.getElementById("refresh-batch-view");
@@ -26,6 +25,7 @@ Office.onReady((info) => {
         const confirmBtn = document.getElementById("confirm-submit");
         const closeBtn = document.getElementById('close-panel');
         const authOverlay = document.getElementById('auth-overlay');
+        const syncSched = document.getElementById('sync-instsched');
 
         // --- REFRESH BATCH VIEW ---
         if (refreshBtn) {
@@ -40,7 +40,27 @@ Office.onReady((info) => {
                 }
             };
         }
+if (syncSched) {
+            syncSched.onclick = async () => {
+                // 1. Trigger the confirmation dialog
+                const confirmed = await showConfirmDialog(
+                    "Refresh Schedule?",
+                    "Run this only when needed, such as when there are changes or updates to your schedule.\n\nNote: You will also need to click the 'Sync Attendance' button afterward to reformat your attendance sheets."
+                );
 
+                // 2. Proceed only if the user clicked "OK"
+                if (confirmed) {
+                    const status = document.getElementById("status-message");
+                    status.innerText = "Refreshing schedule...";
+                    
+                    const userid = await getSettingValue(3);
+                    await createSchedule(userid);
+                    
+                    status.innerText = "✅ Schedule refreshed.";
+                    setTimeout(() => { status.innerText = ""; }, 3000);
+                }
+            };
+        }
         // --- AUTH PANEL CONTROLS ---
         if (submitBtn) {
             submitBtn.onclick = () => showAuthOverlay(() => handleSubmitGrades());
@@ -126,32 +146,43 @@ Office.onReady((info) => {
         }
         
         // --- SYNC CLASS UPDATES ---
+// --- SYNC CLASS UPDATES ---
         if (syncUpdatesBtn) {
             syncUpdatesBtn.onclick = async () => {
-                const status = document.getElementById("status-message");
-                const rawAddress = await getSettingValue(2);
-                const baseUrl = `https://${rawAddress}`;
+                // 1. Trigger the critical warning dialog
+                const confirmed = await showConfirmDialog(
+                    "Download Class Updates?",
+                    "⚠️ WARNING: Use this only on an incomplete sync during initialization, or when the class record has not been used yet.\n\nThis command downloads new updates from the server that might overwrite your current manual input data. Proceed?"
+                );
 
-                const startSync = async () => {
-                    try {
-                        await performFullSync(setProgress, status, baseUrl);
-                        await postSyncCleanup();
-                    } catch (error) {
-                        // If the token is missing OR expired (401/403)
-                        if (error.message.includes("401") || error.message.includes("Missing")) {
-                            status.innerText = "Authentication required...";
-                            showAuthOverlay(async () => {
-                                status.innerText = "Resuming sync...";
-                                await startSync(); // Try again after password is entered
-                            });
-                        } else {
-                            status.innerText = "❌ Sync Failed: " + error.message;
-                            status.style.color = "red";
+                // 2. Only execute the sync if the user explicitly confirms
+                if (confirmed) {
+                    const status = document.getElementById("status-message");
+                    const rawAddress = await getSettingValue(2);
+                    const baseUrl = `https://${rawAddress}`;
+                    
+                    status.innerText = "Starting class updates...";
+
+                    const startSync = async () => {
+                        try {
+                            await performFullSync(setProgress, status, baseUrl);
+                            await postSyncCleanup();
+                        } catch (error) {
+                            if (error.message.includes("401") || error.message.includes("Missing")) {
+                                status.innerText = "Authentication required...";
+                                showAuthOverlay(async () => {
+                                    status.innerText = "Resuming sync...";
+                                    await startSync(); 
+                                });
+                            } else {
+                                status.innerText = "❌ Sync Failed: " + error.message;
+                                status.style.color = "red";
+                            }
                         }
-                    }
-                };
+                    };
 
-                await startSync();
+                    await startSync();
+                }
             };
         }
 
@@ -731,7 +762,6 @@ function showConfirmDialog(title, message) {
         };
     });
 }
-
 async function applyScheduleExclusions(sheet) {
     // 1. Load the Schedule Row (8) and the Action Flag Row (13)
     const scheduleRange = sheet.getRange("H8:IW8");
@@ -765,7 +795,6 @@ async function applyScheduleExclusions(sheet) {
         console.log("✅ Applied schedule exclusions (-1 applied to unscheduled dates).");
     }
 }
-
 async function syncAttendance() {
     const status = document.getElementById("status-message");
     const excludeOutsideSchedule = document.getElementById("exclude-outside-schedule").checked;
@@ -794,7 +823,7 @@ async function syncAttendance() {
             status.style.color = "orange";
             return; 
         }
-
+        
         if (excludeOutsideSchedule) {
             status.innerText = "Applying schedule filters...";
             await applyScheduleExclusions(sheet);
@@ -803,7 +832,7 @@ async function syncAttendance() {
         status.innerText = "Preparing sync...";
         const batchId = bProp.value;
         const instructorId = await getSettingValue(3);
-
+        await injectSheetFormulas(context, sheet, "Attendance", batchId); 
         // 2. Load Metadata from cells
         const subjectRange = sheet.getRange("F10");
         const totalTraineesRange = sheet.getRange("B13");
@@ -890,7 +919,7 @@ async function syncAttendance() {
                 // shouldRetrieve remains false, skipping the fetch
             }
         } else {
-            status.innerText = "No changes to sync. Checking for updates...";
+            status.innerText = "No local changes to upload. Checking for updates...";
             shouldRetrieve = true; // Nothing to push, but safe to pull
         }
 
@@ -912,7 +941,6 @@ async function clearAttendanceFlags(sheet, lastRow) {
     range.values = newVals;
     await sheet.context.sync();
 }
-
 async function syncInstructorAttendance(context, batchId) {
     const status = document.getElementById("status-message");
     try {
@@ -1138,4 +1166,355 @@ async function retrieveAttendanceScans(context, batchId) {
         status.innerText = "❌ Error processing scans.";
         status.style.color = "red";
     }
+}
+function initScheduleMonitor() {
+    // 1. Run the check immediately so the card appears on load
+    checkCurrentSchedule();
+
+    // 2. Set interval for subsequent checks (every 30 seconds)
+    const timerId = setInterval(checkCurrentSchedule, 30000);
+
+    window.onbeforeunload = () => clearInterval(timerId);
+}
+
+async function startScheduleTimer() {
+    // Run the check every 30 seconds
+    const timerId = setInterval(async () => {
+        try {
+            await Excel.run(async (context) => {
+                const table = context.workbook.tables.getItem("ScheduleTab");
+                
+                // Load the specific columns we need by their header names
+                const columns = table.columns.load("name, values");
+                await context.sync();
+
+                // Convert table columns into an array of objects for easy filtering
+                const scheduleData = transformTableToObject(columns.items);
+                
+                const now = new Date();
+                const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+                const currentDay = days[now.getDay()];
+                const currentMins = (now.getHours() * 60) + now.getMinutes();
+
+                // Find the match based on day and time range
+                const activeSched = scheduleData.find(row => {
+                    const dayMatch = row.schedulecode.substring(0, 3).toUpperCase() === currentDay;
+                    const startMins = timeToMins(row.timein);
+                    const endMins = timeToMins(row.timeout);
+                    
+                    return dayMatch && currentMins >= startMins && currentMins <= endMins;
+                });
+
+                if (activeSched) {
+    updateUI(activeSched);
+} else {
+    // Pass null to trigger the "pale gray" empty state
+    updateUI(null); 
+}
+            });
+        } catch (error) {
+            console.error("Timer Error:", error);
+        }
+    }, 30000);
+
+    // Stop timer if the pane is closed/reloaded
+    window.onbeforeunload = () => clearInterval(timerId);
+}
+
+async function checkCurrentSchedule() {
+    try {
+        await Excel.run(async (context) => {
+            const table = context.workbook.tables.getItem("ScheduleTab");
+            const columns = table.columns.load("name, values");
+            await context.sync();
+
+            const scheduleData = transformTableToObject(columns.items);
+            const now = new Date();
+            const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+            const currentDay = days[now.getDay()];
+            const currentMins = (now.getHours() * 60) + now.getMinutes();
+
+            const activeSched = scheduleData.find(row => {
+                const dayMatch = row.schedulecode.substring(0, 3).toUpperCase() === currentDay;
+                const startMins = timeToMins(row.timein);
+                const endMins = timeToMins(row.timeout);
+                return dayMatch && currentMins >= startMins && currentMins <= endMins;
+            });
+
+            // --- THE BLOCK YOU ASKED ABOUT ---
+            if (activeSched) {
+                updateUI(activeSched);
+            } else {
+                // Pass null to trigger the "pale gray" empty state
+                updateUI(null);
+            }
+            // ---------------------------------
+        });
+    } catch (error) {
+        console.error("Schedule Check Error:", error);
+    }
+}
+
+/** 
+ * Helper: Converts Excel column arrays into a list of JS Objects
+ */
+function transformTableToObject(columnItems) {
+    const rowCount = columnItems[0].values.length;
+    let data = [];
+
+    // Start from index 1 to skip the header row itself
+    for (let i = 1; i < rowCount; i++) {
+        let obj = {};
+        columnItems.forEach(col => {
+            obj[col.name] = col.values[i][0];
+        });
+        data.push(obj);
+    }
+    return data;
+}
+
+/** 
+ * Helper: Standardizes time strings to total minutes
+ */
+function timeToMins(timeVal) {
+    if (!timeVal) return -1;
+    // Excel might provide time as a decimal (0.677) or a string "16:15:00"
+    if (typeof timeVal === 'number') {
+        return Math.round(timeVal * 1440);
+    }
+    const parts = timeVal.split(':');
+    return (parseInt(parts[0]) * 60) + parseInt(parts[1]);
+}
+
+function updateUI(sched) {
+    const container = document.getElementById("schedule-container");
+    
+    if (!sched) {
+        container.innerHTML = `
+            <div class="schedule-card empty" style="background-color: #f3f2f1; padding: 12px; border: 1px dashed #ccc; text-align: center;">
+                <span class="ms-fontSize-xs" style="color: #605e5c;">No active class at this time.</span>
+            </div>`;
+        return;
+    }
+
+    const accentColor = sched.color ? `#${sched.color}` : '#0078d4';
+
+    // Store technical IDs in data attributes
+    container.innerHTML = `
+        <div class="schedule-card" style="border-left: 6px solid ${accentColor}; background: white; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="font-weight: 600; font-size: 15px;">${sched.subjectcode}</div>
+            <div style="font-size: 13px; color: #323130;">${sched.subjectTitle}</div>
+            <div style="font-size: 12px; color: #605e5c;">${sched.batchname}</div>
+            <div style="font-size: 12px; color: #605e5c; margin-top: 4px;">
+                <i class="ms-Icon ms-Icon--PoI"></i> ${sched.roomcode} - ${sched.roomdesc}
+            </div>
+            <button id="card-check-attendance" 
+                class="ms-Button ms-Button--primary" 
+                style="width: 100%; margin-top: 10px; background-color: #0078d4; color: white; border: none; height: 32px;"
+                data-subjectno="${sched.subjectno}" 
+                data-batchid="${sched.batchid}" 
+                data-instructorid="${sched.instructorid}">
+                <span class="ms-Button-label">Live Check Attendance</span>
+            </button>
+        </div>
+    `;
+
+document.getElementById("card-check-attendance").onclick = function() {
+    const subjectNo = this.getAttribute("data-subjectno");
+    const batchId = this.getAttribute("data-batchid");
+    const instructorId = this.getAttribute("data-instructorid");
+    // Extract batch name from the UI element or data attribute
+    const batchName = sched.batchname; 
+    
+    showTraineeDrawer(instructorId, batchId, subjectNo, null, batchName);
+};
+}
+
+async function showTraineeDrawer(instructorId, batchId, subjectNo, targetDate = null, batchName = "Select All") {
+    const overlay = document.getElementById('trainee-overlay');
+    const panel = document.getElementById('trainee-panel');
+    const container = document.getElementById('trainee-list-container');
+    const closeBtn = document.getElementById('close-trainee-panel');
+    const refreshBtn = document.getElementById('confirm-trainee-selection');
+
+    // 1. Hide Panel Logic
+    const hideTraineePanel = () => {
+        panel.classList.remove('show');
+        setTimeout(() => { overlay.style.display = 'none'; }, 300);
+    };
+
+    closeBtn.onclick = hideTraineePanel;
+    overlay.onclick = (e) => { if (e.target === overlay) hideTraineePanel(); };
+
+// 2. The Internal Re-query Function (Fetch Logic)
+    const loadData = async () => {
+        container.innerHTML = '<div class="status neutral">Connecting to live records...</div>';
+        const date = targetDate || new Date().toISOString().split('T')[0];
+        const rawAddress = await getSettingValue(2);
+        const token = await getSettingValue(6);
+
+        try {
+            // Define both URLs
+            const traineesUrl = `https://${rawAddress}/fl_get_attendance_records?instructorid=${instructorId}&batchid=${batchId}&subjectno=${subjectNo}&date=${date}`;
+            const classStatusUrl = `https://${rawAddress}/attendance/check-class?instructorid=${instructorId}&batchid=${batchId}&subjectno=${subjectNo}&date=${date}`;
+            
+            const fetchOptions = { headers: { 'Authorization': `Bearer ${token}` } };
+
+            // Fetch BOTH at the same time for maximum speed
+            const [response, statusResponse] = await Promise.all([
+                fetch(traineesUrl, fetchOptions),
+                fetch(classStatusUrl, fetchOptions)
+            ]);
+
+            if (response.status === 401 || response.status === 403) {
+                showAuthOverlay(async () => await showTraineeDrawer(instructorId, batchId, subjectNo, targetDate, batchName));
+                return;
+            }
+
+            if (!response.ok || !statusResponse.ok) throw new Error("Server error");
+            
+            const records = await response.json();
+            const classStatus = await statusResponse.json();
+
+            if (records.length === 0) {
+                container.innerHTML = '<div class="status neutral">No trainees found for this class.</div>';
+                return;
+            }
+
+            // Determine if the master checkbox should be checked
+            const masterCheckedAttr = classStatus.isStarted ? 'checked' : '';
+
+            // Render Header Checkbox + List
+            container.innerHTML = `
+                <div class="trainee-item" style="border-bottom: 2px solid #edebe9; margin-bottom: 10px; background: #f8f8f8;">
+                    <input type="checkbox" id="batch-master-toggle" ${masterCheckedAttr}>
+                    <label for="batch-master-toggle" style="font-weight: 700; font-size:16px;">
+                        ${batchName.replace('Batch ', '')}
+                    </label>
+                </div>
+                <div id="trainee-items-list">
+                    ${records.map(rec => `
+                        <div class="trainee-item">
+                            <input type="checkbox" class="trainee-check" id="tr-${rec.traineesid}" value="${rec.traineesid}" ${rec.recordid ? 'checked' : ''}>
+                            <label for="tr-${rec.traineesid}">
+                                ${rec.trainee}
+                                ${rec.recordid ? '<span style="color:green; font-size:10px; margin-left:8px;">(Present)</span>' : ''}
+                            </label>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            // ==========================================
+            // 👉 ATTACH EVENT LISTENERS HERE
+            // ==========================================
+
+            // 1. Master Toggle Logic
+            const masterToggle = document.getElementById('batch-master-toggle');
+            if (masterToggle) {
+                masterToggle.onchange = async () => {
+                    const action = masterToggle.checked ? 'add' : 'remove';
+                    
+                    if (action === 'remove') {
+                        const confirmed = await showConfirmDialog("Clear Class Attendance?", "Unchecking this will delete ALL attendance records for this class session. Continue?");
+                        if (!confirmed) {
+                            masterToggle.checked = true;
+                            return;
+                        }
+                    }
+
+                    const result = await toggleAttendanceAPI({
+                        instructorid: instructorId,
+                        batchid: batchId,
+                        subjectno: subjectNo,
+                        targetid: batchId,
+                        action: action,
+                        isBulk: true
+                    });
+
+                    if (result && action === 'remove') loadData(); 
+                };
+            }
+
+// 2. Individual Trainee Toggle Logic
+            container.querySelectorAll('.trainee-check').forEach(cb => {
+                cb.onchange = async () => {
+                    const action = cb.checked ? 'add' : 'remove';
+
+                    // --- NEW AUTO-START CLASS LOGIC ---
+                    // If a trainee is checked, but the Master Batch isn't checked yet
+                    if (action === 'add' && masterToggle && !masterToggle.checked) {
+                        
+                        masterToggle.checked = true; // 1. Visually check the Master UI
+                        
+                        // 2. Automatically create the Class/Batch record in the database
+                        await toggleAttendanceAPI({
+                            instructorid: instructorId,
+                            batchid: batchId,
+                            subjectno: subjectNo,
+                            targetid: batchId, // Sending BatchID creates the class header
+                            action: 'add',
+                            isBulk: false
+                        });
+                        console.log("Auto-started class attendance based on trainee check.");
+                    }
+                    // ----------------------------------
+
+                    // 3. Process the actual Trainee record
+                    const success = await toggleAttendanceAPI({
+                        instructorid: instructorId,
+                        batchid: batchId,
+                        subjectno: subjectNo,
+                        targetid: cb.value,
+                        action: action,
+                        isBulk: false
+                    });
+
+                    if (!success) {
+                        cb.checked = !cb.checked; // Revert trainee UI on failure
+                    } else if (action === 'add') {
+                        // Optional UX touch: Add the (Present) text immediately without reloading
+                        const label = cb.nextElementSibling;
+                        if (!label.innerHTML.includes('(Present)')) {
+                            label.innerHTML += ' <span style="color:green; font-size:10px; margin-left:8px;">(Present)</span>';
+                        }
+                    } else if (action === 'remove') {
+                        // Optional UX touch: Remove the (Present) text immediately without reloading
+                        const label = cb.nextElementSibling;
+                        const presentSpan = label.querySelector('span');
+                        if (presentSpan) presentSpan.remove();
+                    }
+                };
+            });
+        } catch (error) {
+            container.innerHTML = `<div class="status neutral" style="color: #a4262c; background: #fde7e9; border: 1px solid #a4262c;">
+                <strong>Connection Problem</strong><br>You are currently offline.</div>`;
+        }
+    };
+
+
+    overlay.style.display = 'flex';
+    setTimeout(() => panel.classList.add('show'), 50);
+    
+    // Set Footer Button to Refresh
+    refreshBtn.querySelector('.ms-Button-label').innerText = "Refresh List";
+    refreshBtn.onclick = loadData;
+
+    await loadData();
+}
+
+async function toggleAttendanceAPI(payload) {
+    const rawAddress = await getSettingValue(2);
+    const token = await getSettingValue(6);
+    try {
+        const response = await fetch(`https://${rawAddress}/attendance/toggle-live`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+        return response.ok;
+    } catch (e) { return false; }
 }
