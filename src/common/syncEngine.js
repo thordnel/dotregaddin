@@ -794,6 +794,8 @@ async function injectSheetFormulas(context, sheet, baseName, batchId) {
             allNames.add(`AF_${batchId}_${subjectId}_18`, sheet.getRange("F13"));
             await context.sync();
 
+            //do adjustment on 
+
             console.log("Restored formulas in attendance tab");
             break;
         case "Gradesheet":
@@ -810,11 +812,28 @@ async function injectSheetFormulas(context, sheet, baseName, batchId) {
             sheet.getRange("H8").formulas = [[`=UPPER(XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[course])) & " (" & MID(K13, SEARCH("Batch", K13), SEARCH(" (", K13) - SEARCH("Batch", K13)) & ")"`]];
             sheet.getRange("K13").formulas = [[`=XLOOKUP(K15, BatchlistTab[batchid], BatchlistTab[batchname])`]]
             sheet.getRange("H11").formulas = [[`=XLOOKUP(Settings!B3, InstructorsTab[idnumber], InstructorsTab[Firstname] & " " & LEFT(InstructorsTab[Middlename], 1) & ". " & InstructorsTab[Lastname] & IF(InstructorsTab[Suffix]<>"", ", " & InstructorsTab[Suffix], ""))`]];
+            sheet.getRange("A6").formulas = [[`=IF(XLOOKUP(XLOOKUP(Settings!B3& K15, ScheduleTab[instructorid] & ScheduleTab[batchid], ScheduleTab[subjectno]),SubjectTab[subjectno],SubjectTab[labhours])<1,"GRADESHEET FOR TOOL SUBJECT","GRADESHEET FOR CORE SUBJECT")`]]
+            
             sheet.getRange("C20:H50").clear(Excel.ClearApplyTo.contents);
             sheet.getRange("A20:A50").clear(Excel.ClearApplyTo.contents);
             sheet.getRange("A20:S20").clear(Excel.ClearApplyTo.contents);
+
+            const gslab = sheet.getRange("A6");
+            gslab.calculate();
+            gslab.load("values");
             await context.sync();
 
+  
+            const hasGSLab = String(gslab.values[0][0] || "");
+            if (!hasGSLab.includes("CORE")) {
+                const GStargetRange = sheet.getRange("C:H");
+                GStargetRange.format.columnWidth = 90;
+                sheet.getRange("D:D").columnHidden = true;
+                sheet.getRange("F:F").columnHidden = true;
+                sheet.getRange("H:H").columnHidden = true;
+                await context.sync();
+            }
+                
             //gradesheet GP formulas
             startRow = 21;
             formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
@@ -909,7 +928,17 @@ async function injectSheetFormulas(context, sheet, baseName, batchId) {
             sheet.getRange("BH18").values = 100;
             sheet.getRange("BQ18").values = 100;
             
+            const mtlab = sheet.getRange("C14");
+            mtlab.calculate();
+            mtlab.load("values");
+            await context.sync();
 
+  
+            const hasMLab = String(mtlab.values[0][0] || "");
+            if (!hasMLab.includes("CORE")) {
+                sheet.getRange("AN:BR").columnHidden = true;
+                await context.sync();
+            }
             
             startRow = 21;
             formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
@@ -986,6 +1015,19 @@ async function injectSheetFormulas(context, sheet, baseName, batchId) {
             sheet.getRange("C12").formulas = [[`=XLOOKUP(I12, BatchlistTab[batchid], BatchlistTab[batchname])`]];    
             sheet.getRange("C13").formulas = [[`=XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=I12) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjectcode]) & " - " & UPPER(XLOOKUP(XLOOKUP(1, (TranscriptTab[BatchID]=I12) * (TranscriptTab[instructorid]=Settings!B3), TranscriptTab[subjectno]), SubjectTab[subjectno], SubjectTab[subjecttitle]))`]];   
             sheet.getRange("C14").formulas = [[`=IF(XLOOKUP(XLOOKUP(Settings!B3& I12, ScheduleTab[instructorid] & ScheduleTab[batchid], ScheduleTab[subjectno]),SubjectTab[subjectno],SubjectTab[labhours])<1,"TOOL SUBJECT","CORE SUBJECT")`]];
+            
+            const ftlab = sheet.getRange("C14");
+            ftlab.calculate();
+            ftlab.load("values");
+            await context.sync();
+
+  
+            const hasFLab = String(ftlab.values[0][0] || "");
+            if (!hasFLab.includes("CORE")) {
+                sheet.getRange("AN:BR").columnHidden = true;
+                await context.sync();
+            }
+            
             startRow = 21;
             
             formulaPayload = Array.from({ length: studentRowsCount }, (_, i) => {
