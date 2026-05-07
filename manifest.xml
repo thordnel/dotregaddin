@@ -6,8 +6,8 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DOT.REG Class Record"/>
   <Description DefaultValue="Dynamic class record manager for DOT.REG System"/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/64.png"/>
+  <IconUrl DefaultValue="https://localhost:3000/assets/icn32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icn64.png"/>
   <SupportUrl DefaultValue="https://thordnel.github.io/dotregaddin/help"/>
   <AppDomains>
     <AppDomain>https://localhost:3000</AppDomain>
@@ -36,9 +36,9 @@
               <Group id="CommandsGroup">
                 <Label resid="CommandsGroup.Label"/>
                 <Icon>
-                  <bt:Image size="16" resid="icn16"/>
-                  <bt:Image size="32" resid="icn32"/>
-                  <bt:Image size="80" resid="icn80"/>
+                  <bt:Image size="16" resid="micn16"/>
+                  <bt:Image size="32" resid="micn32"/>
+                  <bt:Image size="80" resid="micn80"/>
                 </Icon>
                 <Control xsi:type="Button" id="TaskpaneButton">
                   <Label resid="TaskpaneButton.Label"/>
@@ -47,9 +47,9 @@
                     <Description resid="TaskpaneButton.Tooltip"/>
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="icn16"/>
-                    <bt:Image size="32" resid="icn32"/>
-                    <bt:Image size="80" resid="icn80"/>
+                    <bt:Image size="16" resid="micn16"/>
+                    <bt:Image size="32" resid="micn32"/>
+                    <bt:Image size="80" resid="micn80"/>
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <TaskpaneId>ButtonId1</TaskpaneId>
@@ -64,9 +64,9 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="icn16" DefaultValue="https://localhost:3000/assets/16.png"/>
-        <bt:Image id="icn32" DefaultValue="https://localhost:3000/assets/32.png"/>
-        <bt:Image id="icn80" DefaultValue="https://localhost:3000/assets/80.png"/>
+        <bt:Image id="micn16" DefaultValue="https://localhost:3000/assets/icn16.png"/>
+        <bt:Image id="micn32" DefaultValue="https://localhost:3000/assets/icn32.png"/>
+        <bt:Image id="micn80" DefaultValue="https://localhost:3000/assets/icn80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>

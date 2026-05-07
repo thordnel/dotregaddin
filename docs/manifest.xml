@@ -6,11 +6,10 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DOT.REG Class Record"/>
   <Description DefaultValue="Dynamic class record manager for DOT.REG System"/>
-  <IconUrl DefaultValue="https://thordnel.github.io/dotregaddin/assets/32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://thordnel.github.io/dotregaddin/assets/64.png"/>
+  <IconUrl DefaultValue="https://thordnel.github.io/dotregaddin/assets/icn32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://thordnel.github.io/dotregaddin/assets/icn64.png"/>
   <SupportUrl DefaultValue="https://thordnel.github.io/dotregaddin/help"/>
   <AppDomains>
-    <AppDomain>https://thordnel.github.io/</AppDomain>
     <AppDomain>https://node.tesdadvts.org</AppDomain>
     <AppDomain>https://macdemo.tesdadvts.org</AppDomain>
   </AppDomains>
@@ -36,9 +35,9 @@
               <Group id="CommandsGroup">
                 <Label resid="CommandsGroup.Label"/>
                 <Icon>
-                  <bt:Image size="16" resid="icn16"/>
-                  <bt:Image size="32" resid="icn32"/>
-                  <bt:Image size="80" resid="icn80"/>
+                  <bt:Image size="16" resid="micn16"/>
+                  <bt:Image size="32" resid="micn32"/>
+                  <bt:Image size="80" resid="micn80"/>
                 </Icon>
                 <Control xsi:type="Button" id="TaskpaneButton">
                   <Label resid="TaskpaneButton.Label"/>
@@ -47,9 +46,9 @@
                     <Description resid="TaskpaneButton.Tooltip"/>
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="icn16"/>
-                    <bt:Image size="32" resid="icn32"/>
-                    <bt:Image size="80" resid="icn80"/>
+                    <bt:Image size="16" resid="micn16"/>
+                    <bt:Image size="32" resid="micn32"/>
+                    <bt:Image size="80" resid="micn80"/>
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <TaskpaneId>ButtonId1</TaskpaneId>
@@ -64,9 +63,9 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="icn16" DefaultValue="https://thordnel.github.io/dotregaddin/assets/16.png"/>
-        <bt:Image id="icn32" DefaultValue="https://thordnel.github.io/dotregaddin/assets/32.png"/>
-        <bt:Image id="icn80" DefaultValue="https://thordnel.github.io/dotregaddin/assets/80.png"/>
+        <bt:Image id="micn16" DefaultValue="https://thordnel.github.io/dotregaddin/assets/icn16.png"/>
+        <bt:Image id="micn32" DefaultValue="https://thordnel.github.io/dotregaddin/assets/icn32.png"/>
+        <bt:Image id="micn80" DefaultValue="https://thordnel.github.io/dotregaddin/assets/icn80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812"/>
@@ -75,11 +74,11 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Get started with DOT.REG Class Record Manager Addin!"/>
-        <bt:String id="CommandsGroup.Label" DefaultValue="DOTREG Portal"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="DOT.REG Class Record"/>
+        <bt:String id="CommandsGroup.Label" DefaultValue="DOT.REG Portal"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Class Record"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="DOT.REG Class Record Manager add-in loaded successfully. Go to the HOME tab and click the 'DOT.REG Portal' button to get started."/>
+        <bt:String id="GetStarted.Description" DefaultValue="DOT.REG Class Record Manager add-in loaded successfully. Go to the HOME tab and click the 'Class Record' button."/>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Click to show DOT.REG Portal"/>
       </bt:LongStrings>
     </Resources>
