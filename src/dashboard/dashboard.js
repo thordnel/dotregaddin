@@ -275,6 +275,7 @@ const handleGradeToggle = async (mode, activeToggle, otherToggle) => {
 async function onSheetActivated(event) {
     const manualRawToggle = document.getElementById("manual-raw-toggle");
     const manualAutoToggle = document.getElementById("manual-auto-toggle");
+    const submitGradesBtn = document.getElementById("submit-gradesheet");
 
     await Excel.run(async (context) => {
         const sheet = context.workbook.worksheets.getItem(event.worksheetId);
@@ -286,6 +287,23 @@ async function onSheetActivated(event) {
 
         // Check if we are on a Gradesheet
         const isGradesheet = !tProp.isNullObject && tProp.value === "gradesheet_record";
+
+        // Enable/Disable the Submit button dynamically
+if (submitGradesBtn) {
+            if (!isGradesheet) {
+                // Not a gradesheet -> Disable button
+                submitGradesBtn.disabled = true;
+                submitGradesBtn.style.opacity = "0.5"; // Make it look faded
+                submitGradesBtn.style.cursor = "not-allowed"; // Change mouse pointer
+                submitGradesBtn.style.pointerEvents = "none"; // Prevent all clicks entirely
+            } else {
+                // Is a gradesheet -> Enable button
+                submitGradesBtn.disabled = false;
+                submitGradesBtn.style.opacity = "1"; // Restore full color
+                submitGradesBtn.style.cursor = "pointer"; // Restore normal pointer
+                submitGradesBtn.style.pointerEvents = "auto"; // Allow clicks
+            }
+        }
 
         if (manualRawToggle && manualAutoToggle) {
             // Enable toggles only if on a gradesheet, otherwise disable
@@ -381,13 +399,118 @@ async function postSyncCleanup() {
         status.style.color = "#605e5c"; // Neutral gray
     }, 5000);
 }
+
 async function handleSubmitGrades() {
     const status = document.getElementById("status-message");
+    
+    // Improved Prompt Message
+    const confirmed = await showConfirmDialog(
+        "Submit Grades to Registrar?",
+        "You are about to submit this gradesheet. Any existing unfinalized grades in the system for these trainees will be overwritten by the current sheet data.\n\nDo you wish to continue?"
+    );
+
+    if (!confirmed) return;
+
+    // Check token right away
+    let token = await getSettingValue(6);
+    if (!token) {
+        showAuthOverlay(() => handleSubmitGrades());
+        return;
+    }
+
     status.innerText = "Processing gradesheet submission...";
-    // ... your logic for reading Excel data and sending to API ...
+    status.style.color = "#43484c";
+
+    try {
+        await Excel.run(async (context) => {
+            const sheet = context.workbook.worksheets.getActiveWorksheet();
+            
+            // SECURITY CHECK: Double-verify they are on a gradesheet
+            const tProp = sheet.customProperties.getItemOrNullObject("sheetType");
+            tProp.load("value");
+            await context.sync();
+
+            if (tProp.isNullObject || tProp.value !== "gradesheet_record") {
+                status.innerText = "⚠️ This action requires an active Gradesheet.";
+                status.style.color = "orange";
+                return;
+            }
+
+            // PERFORMANCE TRICK: Read rows 21 down to 80 all at once to minimize Excel.run calls.
+            // B to M contains Name (B), GP's (C,D,E,F), Temps (G,H), and RecordID (M).
+            const dataRange = sheet.getRange("B21:M80"); 
+            dataRange.load("values");
+            await context.sync();
+
+            const userId = await getSettingValue(4); // ModBy user
+            const payload = [];
+            const rows = dataRange.values;
+
+            // Map columns to their respective indexes:
+            // B=0, C=1, D=2, E=3, F=4, G=5, H=6 ... M=11
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const traineeName = row[0];
+
+                // "Iterate until there is no data in Bx"
+                if (!traineeName || String(traineeName).trim() === "") {
+                    break; 
+                }
+
+                const recordId = row[11];
+                if (!recordId) continue; // Skip if no RecordID exists
+
+                payload.push({
+                    ModBy: userId,
+                    MidLecGP: row[1],
+                    MidLabGP: row[2],
+                    FinLecGP: row[3],
+                    FinLabGP: row[4],
+                    LecGradeTemp: row[5],
+                    LabGradeTemp: row[6],
+                    RecordId: recordId
+                });
+            }
+
+            if (payload.length === 0) {
+                status.innerText = "⚠️ No valid grades found to submit.";
+                status.style.color = "orange";
+                return;
+            }
+
+            status.innerText = `Uploading ${payload.length} records...`;
+
+            // API Upload
+            const rawAddress = await getSettingValue(2);
+            const response = await fetch(`https://${rawAddress}/submit-grades`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                status.innerText = "✅ Gradesheet submitted successfully.";
+                status.style.color = "green";
+                setTimeout(() => { status.innerText = ""; }, 5000);
+            } else if (response.status === 401 || response.status === 403) {
+                status.innerText = "Authentication expired...";
+                showAuthOverlay(() => handleSubmitGrades());
+            } else {
+                throw new Error(`Server returned ${response.status}`);
+            }
+        });
+    } catch (error) {
+        console.error("Submission Error:", error);
+        status.innerText = "❌ Submission failed: " + error.message;
+        status.style.color = "red";
+    }
 }
 
 async function initializeDashboard() {
+   
     const nameDisplay = document.getElementById("instructor-name");
     const dropdown = document.getElementById("class-dropdown");
 

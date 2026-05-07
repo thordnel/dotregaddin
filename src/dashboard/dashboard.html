@@ -8,6 +8,8 @@
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
     <link rel="stylesheet" href="dashboard.css">
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script> -->
 </head>
 
 <body class="ms-Fabric">
@@ -33,27 +35,40 @@
             <i class="ms-Icon ms-Icon--Refresh"></i>
         </button>
     </div>
-<fieldset style="border: 1px solid #d2d0ce; padding: 10px; border-radius: 2px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+<fieldset style="border: 1px solid #d2d0ce; padding: 10px; border-radius: 2px; font-family: 'Segoe UI', sans-serif;">
     <legend style="padding: 0 5px; font-weight: 400; font-size: 12px; color: #323130;">Class Attendance & Schedule</legend>
-        <div id="schedule-container" style="border: 0px dashed #ccc; padding: 2px; min-height: 60px; border-radius: 2px; background-color: #faf9f8;">
+    
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+<!-- <div class="section">
+    <label class="ms-Label" for="fluent-date-picker">Schedule Date & Time</label>
+    <div style="position: relative; padding-right: 28px;"> 
+        <input type="text" id="fluent-date-picker" class="input" placeholder="Select date...">
+        <i class="ms-Icon ms-Icon--Calendar" style="position: absolute; right: 20px; top: 8px; color: #605e5c; pointer-events: none;"></i>
+    </div>
+</div> -->
+
+        <div id="schedule-container" style="padding: 2px; min-height: 60px; border-radius: 2px; background-color: #faf9f8;">
             <span class="ms-fontSize-xs" style="color: #605e5c;">No classes scheduled for today.</span>
         </div>
-        <br>
-    <button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%; margin-bottom: 4px;">
-        <span class="ms-Button-label">Sync Attendance</span>
-    </button>
 
-    <!-- New Checkbox -->
-    <div style="margin-bottom: 12px; margin-top: 4px; display: flex; align-items: center; font-size: 13px; color: #323130;">
-        <input type="checkbox" id="exclude-outside-schedule" style="margin-right: 8px; cursor: pointer;">
-        <label for="exclude-outside-schedule" style="cursor: pointer; font-weight: 400;">Exclude attendance logs outside your schedule</label>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button id="sync-attendance" class="ms-Button ms-Button--primary" style="width: 100%;">
+                <span class="ms-Button-label">Sync Attendance</span>
+            </button>
+
+            <div style="display: flex; align-items: center; font-size: 13px; color: #323130; padding: 4px 0;">
+                <input type="checkbox" id="exclude-outside-schedule" style="margin-right: 8px; cursor: pointer;">
+                <label for="exclude-outside-schedule" style="cursor: pointer; font-weight: 400; font-size: 11px; line-height: 1.2;">Exclude attendance logs outside schedule</label>
+            </div>
+
+            <button id="sync-instsched" class="ms-Button ms-Button--primary" style="width: 100%;">
+                <span class="ms-Button-label">Refresh Schedule</span>
+            </button>
+        </div>
     </div>
-
-
-    <button id="sync-instsched" class="ms-Button ms-Button--primary" style="width: 100%;">
-        <span class="ms-Button-label">Refresh Schedule</span>
-    </button>
 </fieldset>
+
 </div>
 
     
@@ -158,9 +173,9 @@
             <span class="ms-fontWeight-semibold" id="confirm-title">Confirm Action</span>
         </div>
         <div class="panel-body">
-            <p id="confirm-body" class="ms-fontSize-s" style="margin-bottom: 20px; line-height: 1.4;">
-                Are you sure you want to proceed?
-            </p>
+<p id="confirm-body" class="ms-fontSize-s" style="margin-top: 0; margin-bottom: 20px; line-height: 1.4;">
+    Are you sure you want to proceed?
+</p>
             <div style="display: flex; gap: 8px;">
                 <button id="dialog-ok" class="ms-Button ms-Button--primary" style="flex: 1;">OK</button>
                 <button id="dialog-cancel" class="ms-Button" style="flex: 1;">Cancel</button>
